@@ -488,10 +488,14 @@ router.put("/members/:memberId/status", protect, isAdmin, async (req, res) => {
       isActive
     });
     
-    // Get admin's community
-    const admin = await Admin.findById(req.user.id);
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
+    const isSuperAdmin = req.user.role === "SUPER_ADMIN";
+    let admin = null;
+    
+    if (!isSuperAdmin) {
+      admin = await Admin.findById(req.user.id);
+      if (!admin) {
+        return res.status(404).json({ message: "Admin not found" });
+      }
     }
     
     // Find member and verify they belong to admin's community
@@ -500,8 +504,14 @@ router.put("/members/:memberId/status", protect, isAdmin, async (req, res) => {
       return res.status(404).json({ message: "Member not found" });
     }
     
-    if (member.communityId.toString() !== admin.communityId.toString()) {
-      return res.status(403).json({ message: "You can only manage members from your community" });
+    if (!isSuperAdmin) {
+      if (!admin.communityId) {
+        return res.status(403).json({ message: "Admin not assigned to any community" });
+      }
+      
+      if (member.communityId.toString() !== admin.communityId.toString()) {
+        return res.status(403).json({ message: "You can only manage members from your community" });
+      }
     }
     
     // Update member status

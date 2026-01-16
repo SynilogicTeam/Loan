@@ -4,7 +4,7 @@ const api = axios.create({
   baseURL: "/api", // Use relative URL to work with Vite proxy
 });
 
-/* ================= INTERCEPTOR ================= */
+/* ================= REQUEST INTERCEPTOR ================= */
 api.interceptors.request.use((config) => {
   const adminToken = localStorage.getItem("adminToken");
   const memberToken = localStorage.getItem("memberToken");
@@ -38,7 +38,7 @@ api.interceptors.request.use((config) => {
     } else if (adminToken) {
       config.headers.Authorization = `Bearer ${adminToken}`;
     }
-    
+
     if (config.url?.includes('members/')) {
       console.log("❌ No appropriate token found for member API:", config.url);
     }
@@ -47,7 +47,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Add response interceptor for member API debugging
+/* ================= RESPONSE INTERCEPTOR ================= */
 api.interceptors.response.use(
   (response) => {
     if (response.config.url?.includes('members/')) {
@@ -56,6 +56,7 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Log member API errors
     if (error.config?.url?.includes('members/')) {
       console.log("❌ Member API Error:", {
         url: error.config.url,
@@ -65,6 +66,36 @@ api.interceptors.response.use(
         role: localStorage.getItem("role"),
       });
     }
+
+    // Handle common errors with user-friendly messages
+    let errorMessage = "An error occurred";
+
+    if (error.response) {
+      // Server responded with error
+      const status = error.response.status;
+      const data = error.response.data;
+
+      if (status === 401) {
+        errorMessage = "Authentication failed. Please login again.";
+        // Optionally redirect to login
+        // window.location.href = '/login';
+      } else if (status === 403) {
+        errorMessage = "You don't have permission to perform this action.";
+      } else if (status === 404) {
+        errorMessage = "Resource not found.";
+      } else if (status === 500) {
+        errorMessage = "Server error. Please try again later.";
+      } else {
+        errorMessage = data?.message || errorMessage;
+      }
+    } else if (error.request) {
+      // Request made but no response
+      errorMessage = "Cannot connect to server. Please check your connection.";
+    }
+
+    // Store error message for components to use
+    error.userMessage = errorMessage;
+
     return Promise.reject(error);
   }
 );

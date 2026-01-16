@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { getMembers, createMember } from "../../api/member.api";
 import { getCommunities } from "../../api/community.api";
+import { useToast } from "../../components/ui/Toast";
+import Button from "../../components/ui/Button";
 
 export default function Members() {
   const [members, setMembers] = useState([]);
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const { addToast } = useToast();
 
   const role = localStorage.getItem("role");
   const isSuper = role === "SUPER_ADMIN";
@@ -42,34 +46,38 @@ export default function Members() {
   useEffect(() => {
     loadMembers();
     loadCommunities();
-    
+
     // Auto-refresh members every 30 seconds
     const interval = setInterval(() => {
       loadMembers();
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.phone || !form.password) {
-      alert("All fields required");
+      addToast("All fields are required", "warning");
       return;
     }
 
     if (isSuper && !form.communityId) {
-      alert("Please select a community");
+      addToast("Please select a community", "warning");
       return;
     }
 
     try {
+      setSubmitting(true);
       await createMember(form);
       setForm({ name: "", email: "", phone: "", password: "", communityId: "" });
       loadMembers();
-      alert("Member created successfully!");
+      addToast("Member created successfully!", "success");
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to create member");
+      const errorMsg = err.userMessage || err.response?.data?.message || "Failed to create member";
+      addToast(errorMsg, "error");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -82,13 +90,13 @@ export default function Members() {
             {isSuper ? "Manage members across all communities" : "Manage your community members"}
           </p>
         </div>
-        <button
+        <Button
           onClick={loadMembers}
-          disabled={loading}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
+          loading={loading}
+          size="sm"
         >
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+          Refresh
+        </Button>
       </div>
 
       {/* CREATE MEMBER */}
@@ -122,7 +130,7 @@ export default function Members() {
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
-          
+
           {/* Community Selector for Super Admin */}
           {isSuper && (
             <select
@@ -139,10 +147,14 @@ export default function Members() {
             </select>
           )}
         </div>
-        
-        <button className="w-full mt-3 bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700">
-          Add Member
-        </button>
+
+        <Button
+          type="submit"
+          loading={submitting}
+          className="w-full mt-3"
+        >
+          {submitting ? "Adding Member..." : "Add Member"}
+        </Button>
       </form>
 
       {/* MEMBERS LIST */}
@@ -184,11 +196,10 @@ export default function Members() {
                 )}
                 <td className="p-3">
                   <span
-                    className={`px-2 py-1 rounded text-xs font-medium ${
-                      m.isActive
+                    className={`px-2 py-1 rounded text-xs font-medium ${m.isActive
                         ? "bg-green-100 text-green-700"
                         : "bg-red-100 text-red-700"
-                    }`}
+                      }`}
                   >
                     {m.isActive ? "ACTIVE" : "INACTIVE"}
                   </span>

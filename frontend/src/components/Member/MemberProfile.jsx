@@ -80,19 +80,7 @@ export default function MemberProfile({ memberData, onUpdateRequest }) {
           <div className="flex gap-2">
             <button
               onClick={() => {
-                console.log("Test button clicked!");
-                alert("Button is working!");
-              }}
-              className="px-2 py-1 text-xs bg-green-100 text-green-600 rounded"
-            >
-              Test
-            </button>
-            <button
-              onClick={() => {
-                console.log("Request Update button clicked!");
-                console.log("Current showUpdateForm state:", showUpdateForm);
                 setShowUpdateForm(!showUpdateForm);
-                console.log("New showUpdateForm state:", !showUpdateForm);
               }}
               className="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition cursor-pointer"
               style={{ cursor: 'pointer' }}
