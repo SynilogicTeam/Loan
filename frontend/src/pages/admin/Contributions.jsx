@@ -4,10 +4,14 @@ import {
   markContributionPaid,
   getAllContributions,
 } from "../../api/contribution.api";
+import { useToast } from "../../components/ui/Toast";
+import Button from "../../components/ui/Button";
 
 export default function Contributions() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const { addToast } = useToast();
 
   // form state (admin create)
   const [form, setForm] = useState({
@@ -33,48 +37,64 @@ export default function Contributions() {
 
   useEffect(() => {
     load();
-    
+
     // Auto-refresh contributions every 15 seconds
     const interval = setInterval(() => {
       load();
     }, 15000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form.memberId || !form.month || !form.amount || !form.dueDate) {
-      alert("All fields required");
+      addToast("All fields are required", "warning");
       return;
     }
-    await createContribution({
-      memberId: form.memberId,
-      month: form.month,
-      amount: Number(form.amount),
-      dueDate: form.dueDate,
-    });
-    setForm({ memberId: "", month: "", amount: "", dueDate: "" });
-    load();
+
+    try {
+      setSubmitting(true);
+      await createContribution({
+        memberId: form.memberId,
+        month: form.month,
+        amount: Number(form.amount),
+        dueDate: form.dueDate,
+      });
+      setForm({ memberId: "", month: "", amount: "", dueDate: "" });
+      load();
+      addToast("Contribution created successfully!", "success");
+    } catch (err) {
+      const errorMsg = err.userMessage || err.response?.data?.message || "Failed to create contribution";
+      addToast(errorMsg, "error");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const pay = async (id) => {
     if (!confirm("Mark contribution as PAID?")) return;
-    await markContributionPaid(id);
-    load();
+    try {
+      await markContributionPaid(id);
+      load();
+      addToast("Contribution marked as paid", "success");
+    } catch (err) {
+      const errorMsg = err.userMessage || err.response?.data?.message || "Failed to mark as paid";
+      addToast(errorMsg, "error");
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Contributions</h2>
-        <button
+        <Button
           onClick={load}
-          disabled={loading}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
+          loading={loading}
+          size="sm"
         >
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+          Refresh
+        </Button>
       </div>
 
       {/* CREATE (ADMIN) */}
@@ -107,9 +127,13 @@ export default function Contributions() {
           value={form.dueDate}
           onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
         />
-        <button className="col-span-4 bg-indigo-600 text-white py-2 rounded">
-          Create Contribution
-        </button>
+        <Button
+          type="submit"
+          loading={submitting}
+          className="col-span-4"
+        >
+          {submitting ? "Creating..." : "Create Contribution"}
+        </Button>
       </form>
 
       {/* LIST */}
@@ -149,11 +173,10 @@ export default function Contributions() {
                 <td className="p-2">₹{c.lateFee || 0}</td>
                 <td className="p-2">
                   <span
-                    className={`px-2 py-1 rounded text-xs ${
-                      c.status === "PAID"
+                    className={`px-2 py-1 rounded text-xs ${c.status === "PAID"
                         ? "bg-green-100 text-green-700"
                         : "bg-yellow-100 text-yellow-700"
-                    }`}
+                      }`}
                   >
                     {c.status}
                   </span>

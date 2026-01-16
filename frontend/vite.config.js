@@ -9,9 +9,10 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://192.168.29.117:5001',
+        target: 'http://localhost:5001',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path,
       }
     }
   }

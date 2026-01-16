@@ -48,6 +48,59 @@ app.use("/api/withdrawals", withdrawalRoutes);
 app.use("/api/charity", charityRoutes);
 app.use("/api/socialfunds", socialfundRoutes);
 
+/* ROOT ROUTE - Server Status */
+app.get("/", (req, res) => {
+  res.json({
+    status: "✅ Server is running",
+    message: "Community SaaS Backend API",
+    version: "1.0.0",
+    endpoints: {
+      test: "/test - Basic server test",
+      testDb: "/test-db - Database connection test",
+      health: "/health - Health check endpoint",
+      api: {
+        superadmin: "/api/superadmin/*",
+        admin: "/api/admin/*",
+        admins: "/api/admins/*",
+        communities: "/api/communities/*",
+        sessions: "/api/sessions/*",
+        members: "/api/members/*",
+        contributions: "/api/contributions/*",
+        loans: "/api/loans/*",
+        ledger: "/api/ledger/*",
+        dashboard: "/api/dashboard/*",
+        payments: "/api/payments/*",
+        platform: "/api/platform/*",
+        withdrawals: "/api/withdrawals/*",
+        charity: "/api/charity/*",
+        socialfunds: "/api/socialfunds/*"
+      }
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+/* HEALTH CHECK ROUTE */
+app.get("/health", async (req, res) => {
+  try {
+    const mongoose = (await import("mongoose")).default;
+    const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+
+    res.json({
+      status: "healthy",
+      server: "running",
+      database: dbStatus,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "unhealthy",
+      error: error.message
+    });
+  }
+});
+
 /* TEST ROUTE */
 app.get("/test", (req, res) => {
   res.json({ message: "Server OK" });
@@ -58,27 +111,27 @@ app.get("/debug-auth", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     console.log('🔍 Debug Auth - Authorization header:', authHeader);
-    
+
     if (!authHeader) {
       return res.status(401).json({ message: "No authorization header" });
     }
-    
+
     if (!authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ message: "Invalid authorization format" });
     }
-    
+
     const token = authHeader.split(' ')[1];
     console.log('🎫 Debug Auth - Token:', token.substring(0, 50) + '...');
     console.log('🎫 Debug Auth - Token length:', token.length);
-    
+
     const jwt = (await import("jsonwebtoken")).default;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('✅ Debug Auth - Token decoded:', decoded);
-    
+
     const SuperAdmin = (await import("./src/models/SuperAdmin.js")).default;
     const admin = await SuperAdmin.findById(decoded.id).select("-password");
     console.log('👤 Debug Auth - User found:', admin ? 'YES' : 'NO');
-    
+
     if (admin) {
       console.log('📋 Debug Auth - User details:', {
         id: admin._id,
@@ -87,7 +140,7 @@ app.get("/debug-auth", async (req, res) => {
         role: admin.role
       });
     }
-    
+
     res.json({
       message: "Debug auth successful",
       tokenLength: token.length,
@@ -100,12 +153,12 @@ app.get("/debug-auth", async (req, res) => {
         role: admin.role
       } : null
     });
-    
+
   } catch (error) {
     console.error('❌ Debug Auth error:', error.message);
-    res.status(500).json({ 
-      message: "Debug auth failed", 
-      error: error.message 
+    res.status(500).json({
+      message: "Debug auth failed",
+      error: error.message
     });
   }
 });
@@ -115,11 +168,11 @@ app.get("/test-db", async (req, res) => {
   try {
     const Member = (await import("./models/Member.js")).default;
     const Community = (await import("./models/Community.js")).default;
-    
+
     const memberCount = await Member.countDocuments();
     const communityCount = await Community.countDocuments();
-    
-    res.json({ 
+
+    res.json({
       message: "Database OK",
       memberCount,
       communityCount,
@@ -134,7 +187,7 @@ app.get("/test-db", async (req, res) => {
 app.post("/create-super-admin", async (req, res) => {
   try {
     const SuperAdmin = (await import("./models/SuperAdmin.js")).default;
-    
+
     const exists = await SuperAdmin.findOne({ email: "super@admin.com" });
     if (exists) {
       return res.json({ message: "Super admin already exists" });
@@ -142,11 +195,11 @@ app.post("/create-super-admin", async (req, res) => {
 
     const superAdmin = await SuperAdmin.create({
       name: "Super Admin",
-      email: "super@admin.com", 
+      email: "super@admin.com",
       password: "123456"
     });
 
-    res.json({ 
+    res.json({
       message: "Super admin created successfully",
       email: "super@admin.com",
       password: "123456"
@@ -171,7 +224,7 @@ app.post("/create-sample-data", async (req, res) => {
     // 1. Create Communities
     const community1 = await Community.findOneAndUpdate(
       { name: "Shree Shyam Group" },
-      { 
+      {
         name: "Shree Shyam Group",
         description: "Community fund for Shree Shyam Group",
         location: "Mumbai"
@@ -181,7 +234,7 @@ app.post("/create-sample-data", async (req, res) => {
 
     const community2 = await Community.findOneAndUpdate(
       { name: "Mahadev Samiti" },
-      { 
+      {
         name: "Mahadev Samiti",
         description: "Community fund for Mahadev Samiti",
         location: "Delhi"
@@ -191,7 +244,7 @@ app.post("/create-sample-data", async (req, res) => {
 
     // 2. Create Admins - Delete existing and recreate to ensure password hashing
     await Admin.deleteMany({ email: "admin@samiti.com" });
-    
+
     const admin1 = await Admin.create({
       name: "Admin One",
       email: "admin@samiti.com", // Changed to match login credentials
@@ -215,7 +268,7 @@ app.post("/create-sample-data", async (req, res) => {
 
     // 4. Create Members - Delete existing and recreate to ensure password hashing
     await Member.deleteMany({ email: { $in: ["ramesh@gmail.com", "member2@test.com"] } });
-    
+
     const member1 = await Member.create({
       name: "Ramesh Kumar",
       email: "ramesh@gmail.com", // Changed to match login credentials
@@ -226,7 +279,7 @@ app.post("/create-sample-data", async (req, res) => {
 
     const member2 = await Member.create({
       name: "Suresh Sharma",
-      email: "member2@test.com", 
+      email: "member2@test.com",
       phone: "9876543211",
       communityId: community1._id,
       password: "123456"
@@ -271,14 +324,14 @@ app.post("/create-sample-data", async (req, res) => {
 
     // 7. Create EMI Records for the loan
     await EMI.deleteMany({ loanId: loan1._id }); // Clear existing EMIs
-    
+
     const startDate = new Date();
     const emiRecords = [];
-    
+
     for (let i = 1; i <= 12; i++) {
       const dueDate = new Date(startDate);
       dueDate.setMonth(dueDate.getMonth() + i);
-      
+
       emiRecords.push({
         loanId: loan1._id,
         memberId: member1._id,
@@ -291,7 +344,7 @@ app.post("/create-sample-data", async (req, res) => {
         paidDate: i <= 2 ? new Date() : null
       });
     }
-    
+
     await EMI.insertMany(emiRecords);
 
     // 8. Create Ledger Entries
@@ -309,7 +362,7 @@ app.post("/create-sample-data", async (req, res) => {
       { upsert: true, new: true }
     );
 
-    res.json({ 
+    res.json({
       message: "Sample data created successfully!",
       data: {
         communities: 2,
@@ -330,13 +383,54 @@ app.post("/create-sample-data", async (req, res) => {
 
 /* START */
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, '0.0.0.0', () =>
-  console.log(`✅ Server running on http://0.0.0.0:${PORT}`)
-).on('error', (err) => {
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('\n' + '='.repeat(60));
+  console.log('🚀 COMMUNITY SAAS BACKEND SERVER');
+  console.log('='.repeat(60));
+  console.log(`✅ Server Status: RUNNING`);
+  console.log(`🌐 Server URL: http://localhost:${PORT}`);
+  console.log(`🌐 Network URL: http://0.0.0.0:${PORT}`);
+  console.log(`⏰ Started at: ${new Date().toLocaleString()}`);
+  console.log('='.repeat(60));
+  console.log('📡 AVAILABLE ENDPOINTS:');
+  console.log('='.repeat(60));
+  console.log(`   Root:        http://localhost:${PORT}/`);
+  console.log(`   Health:      http://localhost:${PORT}/health`);
+  console.log(`   Test:        http://localhost:${PORT}/test`);
+  console.log(`   Test DB:     http://localhost:${PORT}/test-db`);
+  console.log('');
+  console.log('📋 API ROUTES:');
+  console.log(`   Super Admin: http://localhost:${PORT}/api/superadmin/*`);
+  console.log(`   Admin:       http://localhost:${PORT}/api/admin/*`);
+  console.log(`   Communities: http://localhost:${PORT}/api/communities/*`);
+  console.log(`   Members:     http://localhost:${PORT}/api/members/*`);
+  console.log(`   Sessions:    http://localhost:${PORT}/api/sessions/*`);
+  console.log(`   Loans:       http://localhost:${PORT}/api/loans/*`);
+  console.log(`   Payments:    http://localhost:${PORT}/api/payments/*`);
+  console.log(`   Dashboard:   http://localhost:${PORT}/api/dashboard/*`);
+  console.log('='.repeat(60));
+  console.log('💡 TIPS:');
+  console.log(`   • Open http://localhost:${PORT}/ to see all endpoints`);
+  console.log(`   • Use http://localhost:${PORT}/health for health checks`);
+  console.log(`   • Press Ctrl+C to stop the server`);
+  console.log('='.repeat(60) + '\n');
+}).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${PORT} is already in use. Please kill the process using this port or use a different port.`);
-    console.log(`💡 To find the process: netstat -ano | findstr :${PORT}`);
-    console.log(`💡 To kill the process: taskkill /PID <PID> /F`);
+    console.log('\n' + '='.repeat(60));
+    console.error(`❌ ERROR: Port ${PORT} is already in use!`);
+    console.log('='.repeat(60));
+    console.log(`💡 The backend server is already running on port ${PORT}`);
+    console.log(`💡 Check your other terminals - server might be running there`);
+    console.log('');
+    console.log('🔍 To find the process using this port:');
+    console.log(`   netstat -ano | findstr :${PORT}`);
+    console.log('');
+    console.log('🛑 To kill the process:');
+    console.log(`   taskkill /PID <PID> /F`);
+    console.log('');
+    console.log('✅ Or simply use the already running server!');
+    console.log(`   Open: http://localhost:${PORT}/`);
+    console.log('='.repeat(60) + '\n');
   } else {
     console.error('❌ Server error:', err);
   }
