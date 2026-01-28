@@ -6,23 +6,78 @@ import generateToken from "../utils/generateToken.js";
 ====================== */
 export const registerAdmin = async (req, res) => {
   try {
-    const { name, email, password, communityId } = req.body;
+    console.log('📝 Admin Registration Request Received');
+    console.log('   Body:', { ...req.body, password: '***' });
 
-    if (!name || !email || !password || !communityId) {
-      return res.status(400).json({ message: "All fields are required" });
+    const { name, email, password, phone } = req.body;
+
+    // Validation
+    if (!name || !email || !password) {
+      console.log('❌ Validation failed: Missing required fields');
+      return res.status(400).json({
+        message: "Name, email, and password are required",
+        received: {
+          hasName: !!name,
+          hasEmail: !!email,
+          hasPassword: !!password
+        }
+      });
     }
 
-    const exists = await Admin.findOne({ email });
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanEmail = email.toLowerCase().trim();
+    if (!emailRegex.test(cleanEmail)) {
+      console.log('❌ Validation failed: Invalid email format');
+      return res.status(400).json({ message: "Please enter a valid email address" });
+    }
+
+    // Password validation
+    if (password.length < 6) {
+      console.log('❌ Validation failed: Password too short');
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    // Check if admin already exists
+    console.log('🔍 Checking if admin exists with email:', cleanEmail);
+    const exists = await Admin.findOne({ email: cleanEmail });
     if (exists) {
-      return res.status(400).json({ message: "Admin already exists with this email" });
+      console.log('❌ Admin already exists:', cleanEmail);
+      return res.status(409).json({
+        message: "Admin already exists with this email. Please login or use a different email."
+      });
     }
 
+    // Create admin without community initially
+    console.log('✅ Creating new admin...');
     const admin = await Admin.create({
-      name,
-      email,
+      name: name.trim(),
+      email: cleanEmail,
       password,
-      communityId,
+      phone: phone ? phone.trim() : undefined,
+      // communityId will be null initially - admin can create community after login
+      // Give all permissions to new admins
+      permissions: [
+        'view_dashboard',
+        'manage_members',
+        'manage_contributions',
+        'manage_loans',
+        'manage_sessions',
+        'view_reports',
+        'manage_withdrawals',
+        'approve_loans',
+        'manage_social_fund',
+        'view_settings'
+      ]
     });
+
+    console.log('✅ Admin registered successfully:', {
+      id: admin._id,
+      email: admin.email,
+      name: admin.name
+    });
+
+    const token = generateToken(admin._id, admin.role);
 
     res.status(201).json({
       _id: admin._id,
@@ -30,10 +85,33 @@ export const registerAdmin = async (req, res) => {
       email: admin.email,
       role: admin.role,
       communityId: admin.communityId,
-      token: generateToken(admin._id, admin.role),
+      token: token,
+      message: "Admin registration successful"
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('❌ Admin registration error:', error);
+    console.error('   Error name:', error.name);
+    console.error('   Error message:', error.message);
+    console.error('   Error stack:', error.stack);
+
+    // Handle specific MongoDB errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message).join(', ');
+      return res.status(400).json({
+        message: `Validation error: ${validationErrors}`
+      });
+    }
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Admin already exists with this email. Please login or use a different email."
+      });
+    }
+
+    res.status(500).json({
+      message: error.message || "Server error. Please try again later.",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -43,7 +121,7 @@ export const registerAdmin = async (req, res) => {
 export const loginAdmin = async (req, res) => {
   try {
     console.log("ADMIN LOGIN REQUEST 👉", req.body);
-    
+
     const { email, password } = req.body;
 
     // First try to find in Admin collection
@@ -79,10 +157,10 @@ export const loginAdmin = async (req, res) => {
       return res.status(403).json({ message: "Account is deactivated. Contact Super Admin." });
     }
 
-    // Super Admin doesn't need a community
-    if (!isSuperAdmin && admin.role !== 'SUPER_ADMIN' && !admin.communityId) {
-      console.log("❌ Admin has no community assigned:", email);
-      return res.status(400).json({ message: "Community not linked" });
+    // Super Admin doesn't need a community, and new admins can login without community
+    // They will create community after login
+    if (!isSuperAdmin && admin.role !== 'SUPER_ADMIN' && admin.communityId && !admin.communityId) {
+      console.log("ℹ️ Admin has no community yet - they can create one after login");
     }
 
     console.log("✅ ADMIN/SUPER ADMIN LOGIN SUCCESS 👉", admin.email);

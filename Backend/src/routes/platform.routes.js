@@ -1,6 +1,7 @@
 import express from "express";
 import protect from "../middelware/auth.js";
 import isSuperAdmin from "../middelware/isSuperAdmin.js";
+import generateToken from "../utils/generateToken.js";
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ const router = express.Router();
 router.get("/communities/public", async (req, res) => {
   try {
     console.log("GET /api/platform/communities/public called - PUBLIC ACCESS");
-    
+
     const Community = (await import("../models/Community.js")).default;
 
     // Get only basic community info for registration
@@ -47,10 +48,10 @@ router.get("/stats", protect, isSuperAdmin, async (req, res) => {
     const totalCommunities = await Community.countDocuments();
     const totalMembers = await Member.countDocuments();
     const totalAdmins = await Admin.countDocuments();
-    
+
     // Active subscriptions
-    const activeSubscriptions = await Subscription.countDocuments({ 
-      status: "ACTIVE" 
+    const activeSubscriptions = await Subscription.countDocuments({
+      status: "ACTIVE"
     });
 
     // Monthly revenue calculation
@@ -142,7 +143,7 @@ router.get("/stats", protect, isSuperAdmin, async (req, res) => {
 router.get("/communities/:id", protect, isSuperAdmin, async (req, res) => {
   try {
     console.log("GET /api/platform/communities/:id called with ID:", req.params.id);
-    
+
     const [Community, Member, Plan] = await Promise.all([
       import("../models/Community.js").then(m => m.default),
       import("../models/Member.js").then(m => m.default),
@@ -158,17 +159,17 @@ router.get("/communities/:id", protect, isSuperAdmin, async (req, res) => {
     }
 
     // Get member count and total balance
-    const memberCount = await Member.countDocuments({ 
-      communityId: community._id 
+    const memberCount = await Member.countDocuments({
+      communityId: community._id
     });
 
     // Get total balance from active session
     const Session = (await import("../models/Session.js")).default;
     const mongoose = (await import("mongoose")).default;
-    
-    const activeSession = await Session.findOne({ 
-      communityId: new mongoose.Types.ObjectId(community._id), 
-      isActive: true 
+
+    const activeSession = await Session.findOne({
+      communityId: new mongoose.Types.ObjectId(community._id),
+      isActive: true
     });
 
     const totalBalance = activeSession?.closingBalance || 0;
@@ -200,7 +201,7 @@ router.get("/communities/:id/members", protect, async (req, res) => {
     const members = await Member.find({ communityId: id })
       .select("-password")
       .populate('communityId', 'name');
-    
+
     console.log('✅ Found members for community:', members.length);
     res.json(members);
   } catch (error) {
@@ -216,22 +217,61 @@ router.put("/communities/:id", protect, isSuperAdmin, async (req, res) => {
   try {
     console.log("🔄 UPDATE COMMUNITY:", req.params.id);
     console.log("📝 Update data:", req.body);
-    
-    const { name, description, location, planId, adminName, adminEmail } = req.body;
+
+    const {
+      name,
+      description,
+      location,
+      planId,
+      adminName,
+      adminEmail,
+      fixedContributionEnabled,
+      fixedContributionAmount,
+      fixedContributionDueDay
+    } = req.body;
     const Community = (await import("../models/Community.js")).default;
     const Admin = (await import("../models/Admin.js")).default;
     const Plan = (await import("../models/Plan.js")).default;
-    
+
     // Find community
     const community = await Community.findById(req.params.id);
     if (!community) {
       return res.status(404).json({ message: "Community not found" });
     }
 
-    // Update community basic details
     community.name = name || community.name;
     community.description = description || community.description;
     community.location = location || community.location;
+
+    if (typeof fixedContributionEnabled === "boolean") {
+      if (!community.settings) {
+        community.settings = {};
+      }
+      if (!community.settings.contributions) {
+        community.settings.contributions = {};
+      }
+      community.settings.contributions.fixedEnabled = fixedContributionEnabled;
+    }
+
+    if (typeof fixedContributionAmount === "number") {
+      if (!community.settings) {
+        community.settings = {};
+      }
+      if (!community.settings.contributions) {
+        community.settings.contributions = {};
+      }
+      community.settings.contributions.fixedAmount = fixedContributionAmount;
+    }
+
+    if (typeof fixedContributionDueDay === "number") {
+      if (!community.settings) {
+        community.settings = {};
+      }
+      if (!community.settings.contributions) {
+        community.settings.contributions = {};
+      }
+      community.settings.contributions.fixedDueDay = fixedContributionDueDay;
+    }
 
     // Update plan if provided
     if (planId) {
@@ -246,7 +286,7 @@ router.put("/communities/:id", protect, isSuperAdmin, async (req, res) => {
     // Update admin if provided
     if (adminName || adminEmail) {
       const existingAdmin = await Admin.findOne({ communityId: community._id });
-      
+
       if (existingAdmin) {
         // Update existing admin
         if (adminName) existingAdmin.name = adminName;
@@ -257,7 +297,7 @@ router.put("/communities/:id", protect, isSuperAdmin, async (req, res) => {
         // Create new admin if none exists
         const bcrypt = (await import("bcryptjs")).default;
         const hashedPassword = await bcrypt.hash("defaultPassword123", 10);
-        
+
         const newAdmin = await Admin.create({
           name: adminName,
           email: adminEmail,
@@ -265,14 +305,14 @@ router.put("/communities/:id", protect, isSuperAdmin, async (req, res) => {
           communityId: community._id,
           permissions: [
             "manage_members",
-            "manage_contributions", 
+            "manage_contributions",
             "manage_loans",
             "manage_sessions",
             "view_reports",
             "manage_settings"
           ]
         });
-        
+
         community.admin = newAdmin._id;
         await community.save();
         console.log("✅ New admin created:", newAdmin.email);
@@ -304,7 +344,7 @@ router.get("/communities", protect, isSuperAdmin, async (req, res) => {
   try {
     console.log("GET /api/platform/communities called");
     console.log("User:", req.user);
-    
+
     const [Community, Member, Plan] = await Promise.all([
       import("../models/Community.js").then(m => m.default),
       import("../models/Member.js").then(m => m.default),
@@ -321,17 +361,17 @@ router.get("/communities", protect, isSuperAdmin, async (req, res) => {
     // Add member count, total balance, and revenue for each community
     const communitiesWithStats = await Promise.all(
       communities.map(async (community) => {
-        const memberCount = await Member.countDocuments({ 
-          communityId: community._id 
+        const memberCount = await Member.countDocuments({
+          communityId: community._id
         });
 
         // Get total balance from active session
         const Session = (await import("../models/Session.js")).default;
         const mongoose = (await import("mongoose")).default;
-        
-        const activeSession = await Session.findOne({ 
-          communityId: new mongoose.Types.ObjectId(community._id), 
-          isActive: true 
+
+        const activeSession = await Session.findOne({
+          communityId: new mongoose.Types.ObjectId(community._id),
+          isActive: true
         });
 
         const totalBalance = activeSession?.closingBalance || 0;
@@ -354,7 +394,7 @@ router.get("/communities", protect, isSuperAdmin, async (req, res) => {
 });
 
 /* ======================
-   ALL SUBSCRIPTION PLANS
+   ALL SUBSCRIPTION PLANS (SUPER ADMIN ONLY)
 ====================== */
 router.get("/plans", protect, isSuperAdmin, async (req, res) => {
   try {
@@ -363,6 +403,29 @@ router.get("/plans", protect, isSuperAdmin, async (req, res) => {
     res.json(plans);
   } catch (error) {
     console.error("Platform plans error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/* ======================
+   PUBLIC SUBSCRIPTION PLANS (FOR ALL USERS)
+====================== */
+router.get("/plans/public", async (req, res) => {
+  try {
+    console.log("GET /api/platform/plans/public called - PUBLIC ACCESS");
+
+    const Plan = (await import("../models/Plan.js")).default;
+    const plans = await Plan.find({ isActive: true })
+      .select('name displayName description price features permissions isActive isPopular')
+      .sort({ 'price.monthly': 1 })
+      .limit(10); // Limit to prevent too much data
+
+    console.log("Found public plans:", plans.length);
+
+    res.json(plans);
+
+  } catch (error) {
+    console.error("Public plans error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -387,7 +450,7 @@ router.post("/plans", protect, isSuperAdmin, async (req, res) => {
 router.get("/subscriptions", protect, isSuperAdmin, async (req, res) => {
   try {
     const Subscription = (await import("../models/Subscription.js")).default;
-    
+
     const subscriptions = await Subscription.find()
       .populate('communityId', 'name')
       .populate('planId', 'name displayName')
@@ -503,7 +566,7 @@ router.put("/communities/:id/status", protect, isSuperAdmin, async (req, res) =>
   try {
     const { status } = req.body;
     const Community = (await import("../models/Community.js")).default;
-    
+
     const community = await Community.findByIdAndUpdate(
       req.params.id,
       { subscriptionStatus: status },
@@ -532,9 +595,9 @@ router.get("/members", protect, isSuperAdmin, async (req, res) => {
   try {
     console.log("GET /api/platform/members called");
     console.log("User:", req.user);
-    
+
     const Member = (await import("../models/Member.js")).default;
-    
+
     const members = await Member.find()
       .populate('communityId', 'name')
       .select('-password')
@@ -555,9 +618,9 @@ router.get("/admins", protect, isSuperAdmin, async (req, res) => {
   try {
     console.log("GET /api/platform/admins called");
     console.log("User:", req.user);
-    
+
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     // Only return regular admins, exclude Super Admins
     const admins = await Admin.find({ role: { $ne: 'SUPER_ADMIN' } })
       .populate('communityId', 'name')
@@ -623,7 +686,7 @@ router.put("/admins/:id/status", protect, isSuperAdmin, async (req, res) => {
   try {
     const { isActive } = req.body;
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     const admin = await Admin.findByIdAndUpdate(
       req.params.id,
       { isActive },
@@ -653,16 +716,16 @@ router.put("/admins/:id", protect, isSuperAdmin, async (req, res) => {
     const { name, email, password, communityId, permissions, isActive } = req.body;
     const Admin = (await import("../models/Admin.js")).default;
     const Community = (await import("../models/Community.js")).default;
-    
+
     console.log("Updating admin:", req.params.id);
     console.log("Update data:", { name, email, communityId, permissions, isActive, hasPassword: !!password });
-    
+
     // Check if email is being changed and if it already exists
     const existingAdmin = await Admin.findById(req.params.id);
     if (!existingAdmin) {
       return res.status(404).json({ message: "Admin not found" });
     }
-    
+
     // If email is being changed, check for duplicates
     if (email && email !== existingAdmin.email) {
       const emailExists = await Admin.findOne({ email, _id: { $ne: req.params.id } });
@@ -670,24 +733,24 @@ router.put("/admins/:id", protect, isSuperAdmin, async (req, res) => {
         return res.status(400).json({ message: "An admin with this email address already exists" });
       }
     }
-    
+
     // If community is being changed, update community references
     if (communityId && communityId !== existingAdmin.communityId?.toString()) {
       // Remove admin from old community
       if (existingAdmin.communityId) {
-        await Community.findByIdAndUpdate(existingAdmin.communityId, { 
-          $unset: { admin: 1 } 
+        await Community.findByIdAndUpdate(existingAdmin.communityId, {
+          $unset: { admin: 1 }
         });
       }
-      
+
       // Add admin to new community
       if (communityId !== 'null' && communityId !== '') {
-        await Community.findByIdAndUpdate(communityId, { 
-          admin: req.params.id 
+        await Community.findByIdAndUpdate(communityId, {
+          admin: req.params.id
         });
       }
     }
-    
+
     const updateData = {
       name: name || existingAdmin.name,
       email: email || existingAdmin.email,
@@ -724,12 +787,12 @@ router.put("/admins/:id", protect, isSuperAdmin, async (req, res) => {
 
   } catch (error) {
     console.error("Update admin error:", error);
-    
+
     // Handle duplicate key error
     if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
       return res.status(400).json({ message: "An admin with this email address already exists" });
     }
-    
+
     res.status(500).json({ message: error.message });
   }
 });
@@ -741,10 +804,10 @@ router.put("/admins/:id/permissions", protect, isSuperAdmin, async (req, res) =>
   try {
     const { communityId, permissions, isActive } = req.body;
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     const admin = await Admin.findByIdAndUpdate(
       req.params.id,
-      { 
+      {
         communityId: communityId || null,
         permissions: permissions || [],
         isActive: isActive !== false
@@ -767,23 +830,60 @@ router.put("/admins/:id/permissions", protect, isSuperAdmin, async (req, res) =>
   }
 });
 
+router.post("/admins/:id/impersonate", protect, isSuperAdmin, async (req, res) => {
+  try {
+    const Admin = (await import("../models/Admin.js")).default;
+
+    const admin = await Admin.findById(req.params.id).populate("communityId");
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    if (admin.isActive === false) {
+      return res.status(403).json({ message: "Admin account is deactivated" });
+    }
+
+    const token = generateToken(admin._id, admin.role);
+
+    const responseData = {
+      _id: admin._id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+      permissions: admin.permissions || [],
+      isActive: admin.isActive,
+      token,
+    };
+
+    if (admin.communityId) {
+      responseData.communityId = admin.communityId._id;
+      responseData.communityName = admin.communityId.name;
+    }
+
+    res.json(responseData);
+  } catch (error) {
+    console.error("Impersonate admin error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 /* ======================
    RESET ADMIN PASSWORD
 ====================== */
 router.put("/admins/:id/reset-password", protect, isSuperAdmin, async (req, res) => {
   try {
     const { newPassword } = req.body;
-    
+
     if (!newPassword) {
       return res.status(400).json({ message: "New password is required" });
     }
-    
+
     if (newPassword.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters long" });
     }
-    
+
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     const admin = await Admin.findById(req.params.id);
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
@@ -799,14 +899,14 @@ router.put("/admins/:id/reset-password", protect, isSuperAdmin, async (req, res)
 
     // Store old password hash for verification
     const oldPasswordHash = admin.password;
-    
+
     admin.password = newPassword; // This will be hashed by the pre-save middleware
     await admin.save();
-    
+
     // Verify the password was actually changed
     const updatedAdmin = await Admin.findById(req.params.id);
     const passwordChanged = updatedAdmin.password !== oldPasswordHash;
-    
+
     console.log('✅ PASSWORD RESET COMPLETED:');
     console.log('   - Password Hash Changed:', passwordChanged);
     console.log('   - New Hash Length:', updatedAdmin.password.length);
@@ -843,32 +943,48 @@ router.put("/admins/:id/reset-password", protect, isSuperAdmin, async (req, res)
 ====================== */
 router.delete("/communities/:id", protect, isSuperAdmin, async (req, res) => {
   try {
+    console.log('🗑️ DELETE COMMUNITY REQUEST:');
+    console.log('   - Community ID:', req.params.id);
+    console.log('   - User ID:', req.user.id);
+    console.log('   - User Role:', req.user.role);
+    console.log('   - Timestamp:', new Date().toISOString());
+
     const Community = (await import("../models/Community.js")).default;
     const Admin = (await import("../models/Admin.js")).default;
     const Member = (await import("../models/Member.js")).default;
     const Subscription = (await import("../models/Subscription.js")).default;
-    
+
     const community = await Community.findById(req.params.id);
     if (!community) {
+      console.log('❌ Community not found:', req.params.id);
       return res.status(404).json({ message: "Community not found" });
     }
 
+    console.log('✅ Community found:', community.name);
+
     // Delete related data
-    await Promise.all([
+    const deleteResults = await Promise.all([
       Admin.deleteMany({ communityId: req.params.id }),
       Member.deleteMany({ communityId: req.params.id }),
       Subscription.deleteMany({ communityId: req.params.id })
     ]);
 
+    console.log('🗑️ Deleted related data:');
+    console.log('   - Admins deleted:', deleteResults[0].deletedCount);
+    console.log('   - Members deleted:', deleteResults[1].deletedCount);
+    console.log('   - Subscriptions deleted:', deleteResults[2].deletedCount);
+
     // Delete community
     await Community.findByIdAndDelete(req.params.id);
+
+    console.log('✅ Community deleted successfully:', community.name);
 
     res.json({
       message: `Community "${community.name}" and all related data deleted successfully`
     });
 
   } catch (error) {
-    console.error("Delete community error:", error);
+    console.error("❌ Delete community error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -879,10 +995,10 @@ router.delete("/communities/:id", protect, isSuperAdmin, async (req, res) => {
 router.get("/plans", protect, isSuperAdmin, async (req, res) => {
   try {
     const Plan = (await import("../models/Plan.js")).default;
-    
-    const plans = await Plan.find({ isActive: true }).sort({ 
-      isPopular: -1, 
-      'price.monthly': 1 
+
+    const plans = await Plan.find({ isActive: true }).sort({
+      isPopular: -1,
+      'price.monthly': 1
     });
 
     res.json(plans);
@@ -898,7 +1014,7 @@ router.get("/plans", protect, isSuperAdmin, async (req, res) => {
 router.post("/plans/setup", protect, isSuperAdmin, async (req, res) => {
   try {
     const Plan = (await import("../models/Plan.js")).default;
-    
+
     // Check if plans already exist
     const existingPlans = await Plan.countDocuments();
     if (existingPlans > 0) {
@@ -961,7 +1077,7 @@ router.post("/plans/setup", protect, isSuperAdmin, async (req, res) => {
     ];
 
     const createdPlans = await Plan.insertMany(defaultPlans);
-    
+
     res.status(201).json({
       message: "Default plans created successfully",
       plans: createdPlans
@@ -1012,7 +1128,7 @@ router.get("/community-analytics", protect, async (req, res) => {
 
       // Get all members in this community
       const members = await Member.find({ communityId: community._id });
-      
+
       // Get total contributions for this community
       const contributionStats = await Contribution.aggregate([
         {
@@ -1134,11 +1250,11 @@ router.get("/community-analytics", protect, async (req, res) => {
       // Calculate summary statistics
       const totalContributions = contributionStats[0]?.totalAmount || 0;
       const contributionCount = contributionStats[0]?.totalCount || 0;
-      
+
       const totalLoans = loanStats.reduce((sum, stat) => sum + stat.count, 0);
       const totalLoanAmount = loanStats.reduce((sum, stat) => sum + stat.totalAmount, 0);
       const totalOutstanding = loanStats.reduce((sum, stat) => sum + stat.totalOutstanding, 0);
-      
+
       const activeLoans = loanStats.find(stat => stat._id === 'ACTIVE')?.count || 0;
       const pendingLoans = loanStats.find(stat => stat._id === 'PENDING')?.count || 0;
       const completedLoans = loanStats.find(stat => stat._id === 'COMPLETED')?.count || 0;
@@ -1194,11 +1310,11 @@ router.get("/admins/:id", protect, isSuperAdmin, async (req, res) => {
     console.log('🔍 Super Admin requesting admin details:', req.params.id);
 
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     const admin = await Admin.findById(req.params.id)
       .select("-password")
       .populate('communityId', 'name');
-    
+
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
     }
@@ -1221,7 +1337,7 @@ router.put("/admins/:id/permissions", protect, isSuperAdmin, async (req, res) =>
 
     const { permissions, reason } = req.body;
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     const admin = await Admin.findById(req.params.id);
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
@@ -1233,7 +1349,7 @@ router.put("/admins/:id/permissions", protect, isSuperAdmin, async (req, res) =>
 
     console.log('✅ Admin permissions updated:', admin.name);
 
-    res.json({ 
+    res.json({
       message: 'Permissions updated successfully',
       admin: {
         _id: admin._id,
@@ -1260,69 +1376,8 @@ router.delete("/admins/:id", protect, isSuperAdmin, async (req, res) => {
     const Admin = (await import("../models/Admin.js")).default;
     const Member = (await import("../models/Member.js")).default;
     const Community = (await import("../models/Community.js")).default;
-    
+
     const admin = await Admin.findById(req.params.id).populate('communityId', 'name');
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
-    }
-
-    // Prevent deleting Super Admin
-    if (admin.role === 'SUPER_ADMIN') {
-      return res.status(400).json({ message: "Cannot delete Super Admin account" });
-    }
-
-    // Check if admin has active community members
-    if (admin.communityId) {
-      const memberCount = await Member.countDocuments({ communityId: admin.communityId._id });
-      
-      if (memberCount > 0) {
-        return res.status(400).json({ 
-          message: `Cannot delete admin. Community "${admin.communityId.name}" has ${memberCount} active members. Please transfer or remove all members first.`
-        });
-      }
-
-      // Update community to remove admin reference
-      await Community.findByIdAndUpdate(admin.communityId._id, { 
-        admin: null 
-      });
-    }
-
-    // Store admin info for response
-    const adminInfo = {
-      id: admin._id,
-      name: admin.name,
-      email: admin.email,
-      communityName: admin.communityId?.name || 'No Community'
-    };
-
-    // Delete the admin
-    await Admin.findByIdAndDelete(req.params.id);
-
-    console.log('✅ Admin deleted successfully:', adminInfo.name);
-
-    res.json({
-      message: `Admin "${adminInfo.name}" deleted successfully`,
-      deletedAdmin: adminInfo
-    });
-
-  } catch (error) {
-    console.error('❌ Delete admin error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-/* ======================
-   DELETE ADMIN (SUPER ADMIN ONLY)
-====================== */
-router.delete("/admins/:id", protect, isSuperAdmin, async (req, res) => {
-  try {
-    console.log('🗑️ Super Admin deleting admin:', req.params.id);
-
-    const Admin = (await import("../models/Admin.js")).default;
-    const Member = (await import("../models/Member.js")).default;
-    const Community = (await import("../models/Community.js")).default;
-    
-    const admin = await Admin.findById(req.params.id);
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
     }
@@ -1332,22 +1387,7 @@ router.delete("/admins/:id", protect, isSuperAdmin, async (req, res) => {
       return res.status(403).json({ message: "Cannot delete Super Admin account" });
     }
 
-    // Check if admin has active community members
-    if (admin.communityId) {
-      const memberCount = await Member.countDocuments({ communityId: admin.communityId });
-      if (memberCount > 0) {
-        return res.status(400).json({ 
-          message: `Cannot delete admin. Community has ${memberCount} active members. Please transfer or remove members first.` 
-        });
-      }
-
-      // Update community to remove admin reference
-      await Community.findByIdAndUpdate(admin.communityId, { 
-        $unset: { admin: 1 } 
-      });
-    }
-
-    // Store admin info for response
+    // Store admin info for response before deletion
     const adminInfo = {
       id: admin._id,
       name: admin.name,
@@ -1355,19 +1395,39 @@ router.delete("/admins/:id", protect, isSuperAdmin, async (req, res) => {
       communityName: admin.communityId?.name || 'No Community'
     };
 
-    // Delete admin
+    // Check if admin has active community members
+    if (admin.communityId) {
+      const memberCount = await Member.countDocuments({ communityId: admin.communityId._id });
+
+      if (memberCount > 0) {
+        return res.status(400).json({
+          message: `Cannot delete admin. Community "${admin.communityId.name}" has ${memberCount} active members. Please transfer or remove all members first.`
+        });
+      }
+
+      // Update community to remove admin reference
+      await Community.findByIdAndUpdate(admin.communityId._id, {
+        $unset: { admin: 1 }
+      });
+    }
+
+    // Delete the admin
     await Admin.findByIdAndDelete(req.params.id);
 
     console.log('✅ Admin deleted successfully:', adminInfo.name);
 
     res.json({
+      success: true,
       message: `Admin "${adminInfo.name}" deleted successfully`,
       deletedAdmin: adminInfo
     });
 
   } catch (error) {
     console.error('❌ Delete admin error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 });
 
@@ -1377,7 +1437,7 @@ router.get("/admins/:id/password", protect, isSuperAdmin, async (req, res) => {
     console.log('🔍 Super Admin requesting admin password:', req.params.id);
 
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     const admin = await Admin.findById(req.params.id).populate('communityId', 'name');
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
@@ -1409,13 +1469,13 @@ router.put("/admins/:id/password", protect, isSuperAdmin, async (req, res) => {
     console.log('🔄 Super Admin updating admin password:', req.params.id);
 
     const { newPassword } = req.body;
-    
+
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters long" });
     }
 
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     const admin = await Admin.findById(req.params.id);
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
@@ -1446,7 +1506,7 @@ router.get("/admins-with-passwords", protect, isSuperAdmin, async (req, res) => 
     console.log('🔍 Super Admin requesting all admin passwords');
 
     const Admin = (await import("../models/Admin.js")).default;
-    
+
     const admins = await Admin.find()
       .populate('communityId', 'name')
       .select('-password') // We'll add default password in response

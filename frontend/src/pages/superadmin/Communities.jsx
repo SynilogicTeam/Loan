@@ -26,7 +26,10 @@ export default function Communities() {
     address: "",
     planId: "",
     adminName: "",
-    adminEmail: ""
+    adminEmail: "",
+    fixedContributionEnabled: false,
+    fixedContributionAmount: "",
+    fixedContributionDueDay: "",
   });
 
   useEffect(() => {
@@ -80,11 +83,14 @@ export default function Communities() {
           },
           body: JSON.stringify({
             name: form.name,
-            description: form.address, // Using address as description
+            description: form.address,
             location: form.address,
             planId: form.planId,
             adminName: form.adminName,
-            adminEmail: form.adminEmail
+            adminEmail: form.adminEmail,
+            fixedContributionEnabled: form.fixedContributionEnabled,
+            fixedContributionAmount: form.fixedContributionAmount ? Number(form.fixedContributionAmount) : undefined,
+            fixedContributionDueDay: form.fixedContributionDueDay ? Number(form.fixedContributionDueDay) : undefined,
           })
         });
       } else {
@@ -109,7 +115,16 @@ export default function Communities() {
         }
         setShowCreateModal(false);
         setEditingCommunity(null);
-        setForm({ name: "", address: "", planId: "", adminName: "", adminEmail: "" });
+        setForm({
+          name: "",
+          address: "",
+          planId: "",
+          adminName: "",
+          adminEmail: "",
+          fixedContributionEnabled: false,
+          fixedContributionAmount: "",
+          fixedContributionDueDay: "",
+        });
         loadData();
       } else {
         const error = await response.json();
@@ -342,7 +357,10 @@ export default function Communities() {
                             address: community.location || community.address || "",
                             planId: community.currentPlan?._id || "",
                             adminName: community.admin?.name || "",
-                            adminEmail: community.admin?.email || ""
+                            adminEmail: community.admin?.email || "",
+                            fixedContributionEnabled: community.settings?.contributions?.fixedEnabled || false,
+                            fixedContributionAmount: community.settings?.contributions?.fixedAmount?.toString() || "",
+                            fixedContributionDueDay: community.settings?.contributions?.fixedDueDay?.toString() || "",
                           });
                           setShowCreateModal(true);
                         }}
@@ -437,6 +455,77 @@ export default function Communities() {
                 </select>
               </div>
 
+              <div className="border-t border-slate-200 pt-4 mt-2">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">
+                      Fixed Monthly Contribution
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Set a fixed amount every member should contribute each month
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm(prev => ({
+                        ...prev,
+                        fixedContributionEnabled: !prev.fixedContributionEnabled,
+                      }))
+                    }
+                    className={`px-3 py-1 text-xs rounded-full border ${
+                      form.fixedContributionEnabled
+                        ? "bg-green-100 text-green-700 border-green-200"
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {form.fixedContributionEnabled ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
+
+                {form.fixedContributionEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Monthly Amount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full border border-slate-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g., 5000"
+                        value={form.fixedContributionAmount}
+                        onChange={e =>
+                          setForm(prev => ({
+                            ...prev,
+                            fixedContributionAmount: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Due Day Of Month
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        className="w-full border border-slate-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g., 5"
+                        value={form.fixedContributionDueDay}
+                        onChange={e =>
+                          setForm(prev => ({
+                            ...prev,
+                            fixedContributionDueDay: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Admin Name *
@@ -486,7 +575,16 @@ export default function Communities() {
                   onClick={() => {
                     setShowCreateModal(false);
                     setEditingCommunity(null);
-                    setForm({ name: "", address: "", planId: "", adminName: "", adminEmail: "" });
+                    setForm({
+                      name: "",
+                      address: "",
+                      planId: "",
+                      adminName: "",
+                      adminEmail: "",
+                      fixedContributionEnabled: false,
+                      fixedContributionAmount: "",
+                      fixedContributionDueDay: "",
+                    });
                   }}
                   className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-lg hover:bg-slate-300 font-medium"
                 >

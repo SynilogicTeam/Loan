@@ -21,7 +21,46 @@ export default function MakeContribution() {
     setLoading(true);
 
     try {
-      const response = await makeContribution(form);
+      // Validate form data with detailed logging
+      const amount = parseFloat(form.amount);
+      console.log('🔍 Form Validation:', {
+        originalAmount: form.amount,
+        parsedAmount: amount,
+        isValidAmount: !isNaN(amount) && amount > 0,
+        month: form.month,
+        paymentMethod: form.paymentMethod
+      });
+
+      if (!form.amount || isNaN(amount) || amount <= 0) {
+        alert("Please enter a valid contribution amount (must be a positive number)");
+        setLoading(false);
+        return;
+      }
+
+      if (!form.month) {
+        alert("Please select a contribution month");
+        setLoading(false);
+        return;
+      }
+
+      if (!form.paymentMethod) {
+        alert("Please select a payment method");
+        setLoading(false);
+        return;
+      }
+
+      // Ensure all data is properly formatted
+      const contributionData = {
+        amount: amount, // Ensure it's a number
+        month: form.month,
+        paymentMethod: form.paymentMethod,
+        remarks: form.remarks || ""
+      };
+      
+      console.log('📝 Final Contribution Data:', contributionData);
+      
+      const response = await makeContribution(contributionData);
+      console.log('✅ Contribution Response:', response.data);
       
       if (form.paymentMethod === "online") {
         // For online payments, show Razorpay
@@ -38,6 +77,9 @@ export default function MakeContribution() {
         navigate("/member/dashboard");
       }
     } catch (error) {
+      console.error('❌ Contribution Error:', error);
+      console.error('❌ Error Response:', error.response?.data);
+      
       const errorMessage = error.response?.data?.message || "Failed to record contribution";
       alert(`Error: ${errorMessage}`);
     } finally {
@@ -46,8 +88,22 @@ export default function MakeContribution() {
   };
 
   const handlePaymentSuccess = (paymentResponse, verificationData) => {
+    console.log('🎉 Payment Success:', { paymentResponse, verificationData });
+    
     alert(`Payment Successful! ✅\n\nPayment ID: ${paymentResponse.razorpay_payment_id}\n\nYour contribution has been recorded and payment confirmed.`);
+    
+    // Clear any cached data to force fresh fetch
+    localStorage.removeItem('memberDashboardCache');
+    localStorage.removeItem('memberProfileCache');
+    
+    // Navigate back to dashboard
     navigate("/member/dashboard");
+    
+    // Force a complete page reload to ensure fresh data from server
+    setTimeout(() => {
+      console.log('🔄 Forcing page reload for fresh data...');
+      window.location.reload();
+    }, 500);
   };
 
   const handlePaymentError = (error) => {

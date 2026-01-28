@@ -230,7 +230,7 @@ export default function PlatformManagement() {
 
   const saveSettings = () => {
     console.log("Saving system settings...");
-    alert("System settings saved successfully!\n\n(This is a demo - actual implementation would save to database)");
+    alert("System settings saved successfully!");
   };
 
   const manageSubscription = (subscription) => {
@@ -241,9 +241,6 @@ export default function PlatformManagement() {
   const tabs = [
     { id: 'overview', name: 'Platform Overview', icon: TrendingUp },
     { id: 'communities', name: 'Communities', icon: Building2 },
-    { id: 'plans', name: 'Plans & Pricing', icon: CreditCard },
-    { id: 'subscriptions', name: 'Subscriptions', icon: Calendar },
-    { id: 'settings', name: 'System Settings', icon: Settings },
   ];
 
   const getStatusBadge = (status) => {

@@ -49,6 +49,73 @@ router.get("/contributions", protect, async (req, res) => {
   }
 });
 
+router.get("/contribution-status", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "MEMBER") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const Member = (await import("../models/Member.js")).default;
+    const Community = (await import("../models/Community.js")).default;
+    const Contribution = (await import("../models/Contribution.js")).default;
+
+    const member = await Member.findById(req.user.id);
+    if (!member) {
+      return res.status(404).json({ message: "Member not found" });
+    }
+
+    const community = await Community.findById(member.communityId);
+
+    const now = new Date();
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const currentMonthName = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+
+    const paidContribution = await Contribution.findOne({
+      memberId: req.user.id,
+      month: currentMonthName,
+      status: "PAID",
+    });
+
+    const fixedSettings = community?.settings?.contributions || {};
+    const fixedEnabled = !!fixedSettings.fixedEnabled;
+    const fixedAmount = fixedSettings.fixedAmount || 0;
+    const fixedDueDay = fixedSettings.fixedDueDay || null;
+
+    let overdue = false;
+    if (fixedEnabled && !paidContribution && fixedDueDay) {
+      const todayDay = now.getDate();
+      if (todayDay > fixedDueDay) {
+        overdue = true;
+      }
+    }
+
+    res.json({
+      fixedContributionEnabled: fixedEnabled,
+      fixedContributionAmount: fixedAmount,
+      fixedContributionDueDay: fixedDueDay,
+      isPaidForCurrentMonth: !!paidContribution,
+      isOverdue: overdue,
+      currentMonth: currentMonthName,
+    });
+  } catch (error) {
+    console.error("Member contribution status error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 /* GET MEMBER LOANS */
 router.get("/loans", protect, async (req, res) => {
   try {
@@ -98,8 +165,8 @@ router.get("/profile", protect, async (req, res) => {
       isActive: true
     });
 
-    // Calculate total contributions
-    const totalContributions = await Contribution.aggregate([
+    // Calculate total contributions and count
+    const contributionStats = await Contribution.aggregate([
       {
         $match: {
           memberId: member._id,
@@ -109,12 +176,14 @@ router.get("/profile", protect, async (req, res) => {
       {
         $group: {
           _id: null,
-          total: { $sum: "$amount" }
+          total: { $sum: "$amount" },
+          count: { $sum: 1 }
         }
       }
     ]);
 
-    const contributionAmount = totalContributions[0]?.total || 0;
+    const contributionAmount = contributionStats[0]?.total || 0;
+    const contributionCount = contributionStats[0]?.count || 0;
     
     // Calculate trust score based on contributions and activity
     let trustScore = 50; // Base score
@@ -133,7 +202,9 @@ router.get("/profile", protect, async (req, res) => {
       trustScore: trustScore,
       communityId: member.communityId,
       joinedAt: member.createdAt,
-      totalContributions: contributionAmount
+      totalContributions: contributionAmount,
+      contributionCount: contributionCount,
+      isActive: member.isActive || true
     };
 
     console.log("✅ MEMBER PROFILE LOADED:", profileData.name);
@@ -756,65 +827,6 @@ router.get("/withdrawals", protect, async (req, res) => {
   }
 });
 
-/* GET MEMBER PROFILE */
-router.get("/profile", protect, async (req, res) => {
-  try {
-    if (req.user.role !== "MEMBER") {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    const Member = (await import("../models/Member.js")).default;
-    const Community = (await import("../models/Community.js")).default;
-    const Contribution = (await import("../models/Contribution.js")).default;
-    const Loan = (await import("../models/Loan.js")).default;
-
-    const member = await Member.findById(req.user.id).select("-password");
-    if (!member) {
-      return res.status(404).json({ message: "Member not found" });
-    }
-
-    const community = await Community.findById(member.communityId);
-    const contributionCount = await Contribution.countDocuments({ 
-      memberId: req.user.id, 
-      status: "PAID" 
-    });
-    const loanHistory = await Loan.countDocuments({ 
-      memberId: req.user.id, 
-      status: { $in: ["ACTIVE", "COMPLETED"] }
-    });
-
-    res.json({
-      ...member.toObject(),
-      communityName: community?.name || "Unknown Community",
-      contributionCount,
-      loanHistory
-    });
-
-  } catch (error) {
-    console.error("Profile error:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-/* GET MEMBER LOANS */
-router.get("/loans", protect, async (req, res) => {
-  try {
-    if (req.user.role !== "MEMBER") {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    const Loan = (await import("../models/Loan.js")).default;
-    
-    const loans = await Loan.find({ memberId: req.user.id })
-      .sort({ createdAt: -1 });
-    
-    res.json(loans);
-  } catch (error) {
-    console.error("Member loans error:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
 /* GET MEMBER EMIS */
 router.get("/emis", protect, async (req, res) => {
   try {
@@ -822,10 +834,12 @@ router.get("/emis", protect, async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    console.log("📋 MEMBER EMIS REQUEST:", { memberId: req.user.id });
+
     const EMI = (await import("../models/EMI.js")).default;
     
     const emis = await EMI.find({ memberId: req.user.id })
-      .sort({ dueDate: 1 });
+      .sort({ month: 1 }); // Sort by month ascending
     
     // Calculate late fees for overdue EMIs
     const today = new Date();
@@ -839,13 +853,17 @@ router.get("/emis", protect, async (req, res) => {
         emi.lateFee = lateFee;
         emi.status = "OVERDUE";
         await emi.save();
+        
+        console.log(`⚠️ EMI ${emi._id} marked overdue with ₹${lateFee} late fee (${daysLate} days)`);
       }
       return emi;
     }));
     
+    console.log(`✅ MEMBER EMIS FOUND: ${updatedEmis.length}`);
+    
     res.json(updatedEmis);
   } catch (error) {
-    console.error("Member EMIs error:", error);
+    console.error("❌ MEMBER EMIS ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 });

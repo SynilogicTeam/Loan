@@ -100,6 +100,38 @@ const adminSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // User Settings
+    settings: {
+      type: Object,
+      default: {
+        notifications: {
+          email: true,
+          push: true,
+          sms: false,
+          newMembers: true,
+          payments: true,
+          loans: true,
+          overdue: true
+        },
+        security: {
+          twoFactor: false,
+          sessionTimeout: 30,
+          passwordExpiry: 90
+        },
+        appearance: {
+          theme: 'light',
+          language: 'en',
+          dateFormat: 'DD/MM/YYYY',
+          currency: 'INR'
+        },
+        privacy: {
+          profileVisibility: 'admin',
+          dataSharing: false,
+          analytics: true
+        }
+      }
+    },
   },
   { timestamps: true }
 );

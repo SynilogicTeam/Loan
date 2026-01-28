@@ -1,9 +1,11 @@
 import express from "express";
+// Force restart 2
 import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 
 /* ROUTES */
+import authRoutes from "./routes/auth.routes.js";
 import superAdminRoutes from "./routes/superAdmin.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import communityRoutes from "./routes/community.routes.js";
@@ -18,19 +20,47 @@ import platformRoutes from "./routes/platform.routes.js";
 import withdrawalRoutes from "./routes/withdrawal.routes.js";
 import charityRoutes from "./routes/charity.routes.js";
 import socialfundRoutes from "./routes/socialfund.routes.js";
+import interestRateRoutes from "./routes/interestRate.routes.js";
+import externalBorrowerRoutes from "./routes/externalBorrower.routes.js";
+import externalLoanRoutes from "./routes/externalLoan.routes.js";
+import exportRoutes from "./routes/export.routes.js";
+import alertsRoutes from "./routes/alerts.routes.js";
+import settingsRoutes from "./routes/settings.routes.js";
+import { setupCronJobs } from "./utils/cronJobs.js";
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
 
-/* DB */
+/* DB - Connect to MongoDB */
+// Note: Server will continue even if DB connection fails (for testing)
 connectDB();
 
 /* MIDDLEWARE */
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:8088',
+    'http://localhost:8089', // ✅ ADD NEW FRONTEND PORT
+    'http://localhost:8090', // ✅ ADD PORT 8090 FOR FRONTEND
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8082',
+    'https://loan.synilogictech.in',
+    'http://192.168.29.117:5001',
+    'http://192.168.29.117:8088',
+    'http://192.168.29.125:8089', // ✅ ADD NETWORK IP FOR FRONTEND
+    'http://192.168.29.125:8090', // ✅ ADD NETWORK IP PORT 8090
+    '*', // Allow all origins for mobile app
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+}));
 app.use(express.json());
 
 /* ROUTES REGISTER */
+app.use("/api/auth", authRoutes);
 app.use("/api/superadmin", superAdminRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admins", adminRoutes);  // ✅ ADD THIS FOR /api/admins endpoint
@@ -47,6 +77,16 @@ app.use("/api/platform", platformRoutes);
 app.use("/api/withdrawals", withdrawalRoutes);
 app.use("/api/charity", charityRoutes);
 app.use("/api/socialfunds", socialfundRoutes);
+app.use("/api/interest-rates", interestRateRoutes);
+app.use("/api/external-borrowers", externalBorrowerRoutes);
+app.use("/api/external-loans", externalLoanRoutes);
+app.use("/api/export", exportRoutes);
+app.use("/api/alerts", alertsRoutes);
+app.use("/api/admin/settings", settingsRoutes);
+
+/* ADMIN COMMUNITY MANAGEMENT */
+import adminCommunityRoutes from "./routes/adminCommunity.routes.js";
+app.use("/api/admin/community", adminCommunityRoutes);
 
 /* ROOT ROUTE - Server Status */
 app.get("/", (req, res) => {
@@ -55,8 +95,6 @@ app.get("/", (req, res) => {
     message: "Community SaaS Backend API",
     version: "1.0.0",
     endpoints: {
-      test: "/test - Basic server test",
-      testDb: "/test-db - Database connection test",
       health: "/health - Health check endpoint",
       api: {
         superadmin: "/api/superadmin/*",
@@ -73,8 +111,22 @@ app.get("/", (req, res) => {
         platform: "/api/platform/*",
         withdrawals: "/api/withdrawals/*",
         charity: "/api/charity/*",
-        socialfunds: "/api/socialfunds/*"
+        socialfunds: "/api/socialfunds/*",
+        interestRates: "/api/interest-rates/*",
+        externalBorrowers: "/api/external-borrowers/*",
+        externalLoans: "/api/external-loans/*",
+        export: "/api/export/*",
+        alerts: "/api/alerts/*"
       }
+    },
+    newFeatures: {
+      interestRateConfiguration: "✅ Implemented",
+      lateFeeCalculation: "✅ Implemented with automated cron jobs",
+      pdfExcelExport: "✅ Implemented",
+      externalBorrowerSystem: "✅ Implemented",
+      socialFundManagement: "✅ Enhanced",
+      overdueAlertsSystem: "✅ Implemented",
+      automatedCronJobs: "✅ Implemented"
     },
     timestamp: new Date().toISOString()
   });
@@ -101,86 +153,10 @@ app.get("/health", async (req, res) => {
   }
 });
 
-/* TEST ROUTE */
-app.get("/test", (req, res) => {
-  res.json({ message: "Server OK" });
-});
-
-/* DEBUG AUTH ENDPOINT */
-app.get("/debug-auth", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    console.log('🔍 Debug Auth - Authorization header:', authHeader);
-
-    if (!authHeader) {
-      return res.status(401).json({ message: "No authorization header" });
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: "Invalid authorization format" });
-    }
-
-    const token = authHeader.split(' ')[1];
-    console.log('🎫 Debug Auth - Token:', token.substring(0, 50) + '...');
-    console.log('🎫 Debug Auth - Token length:', token.length);
-
-    const jwt = (await import("jsonwebtoken")).default;
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('✅ Debug Auth - Token decoded:', decoded);
-
-    const SuperAdmin = (await import("./src/models/SuperAdmin.js")).default;
-    const admin = await SuperAdmin.findById(decoded.id).select("-password");
-    console.log('👤 Debug Auth - User found:', admin ? 'YES' : 'NO');
-
-    if (admin) {
-      console.log('📋 Debug Auth - User details:', {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role
-      });
-    }
-
-    res.json({
-      message: "Debug auth successful",
-      tokenLength: token.length,
-      decoded: decoded,
-      userFound: !!admin,
-      user: admin ? {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role
-      } : null
-    });
-
-  } catch (error) {
-    console.error('❌ Debug Auth error:', error.message);
-    res.status(500).json({
-      message: "Debug auth failed",
-      error: error.message
-    });
-  }
-});
-
-/* TEST DATABASE CONNECTION */
-app.get("/test-db", async (req, res) => {
-  try {
-    const Member = (await import("./models/Member.js")).default;
-    const Community = (await import("./models/Community.js")).default;
-
-    const memberCount = await Member.countDocuments();
-    const communityCount = await Community.countDocuments();
-
-    res.json({
-      message: "Database OK",
-      memberCount,
-      communityCount,
-      timestamp: new Date()
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+/* 🔄 FORCE RESTART ROUTE (Temporary Fix) */
+app.get("/force-restart", (req, res) => {
+  res.send("Restarting...");
+  setTimeout(() => process.exit(0), 100);
 });
 
 /* CREATE SUPER ADMIN FOR TESTING */
@@ -249,7 +225,19 @@ app.post("/create-sample-data", async (req, res) => {
       name: "Admin One",
       email: "admin@samiti.com", // Changed to match login credentials
       password: "123456",
-      communityId: community1._id
+      communityId: community1._id,
+      permissions: [
+        'view_dashboard',
+        'manage_members',
+        'manage_contributions',
+        'manage_loans',
+        'manage_sessions',
+        'view_reports',
+        'manage_withdrawals',
+        'approve_loans',
+        'manage_social_fund',
+        'view_settings'
+      ]
     });
 
     // 3. Create Sessions
@@ -396,8 +384,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('='.repeat(60));
   console.log(`   Root:        http://localhost:${PORT}/`);
   console.log(`   Health:      http://localhost:${PORT}/health`);
-  console.log(`   Test:        http://localhost:${PORT}/test`);
-  console.log(`   Test DB:     http://localhost:${PORT}/test-db`);
   console.log('');
   console.log('📋 API ROUTES:');
   console.log(`   Super Admin: http://localhost:${PORT}/api/superadmin/*`);
@@ -414,6 +400,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`   • Use http://localhost:${PORT}/health for health checks`);
   console.log(`   • Press Ctrl+C to stop the server`);
   console.log('='.repeat(60) + '\n');
+
+  // Setup cron jobs after server starts
+  setupCronJobs();
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.log('\n' + '='.repeat(60));

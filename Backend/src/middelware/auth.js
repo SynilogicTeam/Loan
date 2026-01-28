@@ -47,6 +47,7 @@ const protect = async (req, res, next) => {
       }
 
       req.user = {
+        _id: admin._id, // Add _id field
         id: admin._id,
         role: decoded.role, // Use role from token instead of admin.role
         communityId: admin.communityId || null, // Super Admin might not have communityId

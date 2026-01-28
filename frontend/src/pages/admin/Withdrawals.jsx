@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Banknote, Clock, CheckCircle, XCircle, AlertCircle, User, Calendar, FileText, Eye } from "lucide-react";
 import api from "../../api/axios";
 
@@ -9,9 +9,12 @@ export default function Withdrawals() {
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [animateIn, setAnimateIn] = useState(false);
 
   useEffect(() => {
     fetchWithdrawals();
+    const t = setTimeout(() => setAnimateIn(true), 0);
+    return () => clearTimeout(t);
   }, []);
 
   const fetchWithdrawals = async () => {
@@ -61,17 +64,16 @@ export default function Withdrawals() {
   const handleAction = async (withdrawalId, action, remarks = "") => {
     setActionLoading(true);
     try {
-      let response;
       if (action === "approve") {
-        response = await api.put(`/withdrawals/${withdrawalId}/approve`, {
+        await api.put(`/withdrawals/${withdrawalId}/approve`, {
           adminRemarks: remarks || "Approved after review"
         });
       } else if (action === "reject") {
-        response = await api.put(`/withdrawals/${withdrawalId}/reject`, {
+        await api.put(`/withdrawals/${withdrawalId}/reject`, {
           adminRemarks: remarks || "Rejected due to insufficient documentation"
         });
       } else if (action === "disburse") {
-        response = await api.put(`/withdrawals/${withdrawalId}/disburse`, {
+        await api.put(`/withdrawals/${withdrawalId}/disburse`, {
           disbursementMethod: "bank_transfer",
           adminRemarks: remarks || "Amount disbursed successfully"
         });
@@ -98,6 +100,13 @@ export default function Withdrawals() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const formatDate = (value) => {
+    if (!value) return "-";
+    const date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString();
   };
 
   const getStatusIcon = (status) => {
@@ -157,7 +166,8 @@ export default function Withdrawals() {
   }
 
   return (
-    <div className="space-y-6">
+    <ErrorBoundary>
+      <div className={`space-y-6 motion-safe:transition-opacity motion-safe:duration-500 ${animateIn ? 'opacity-100' : 'opacity-0'}`}>
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -171,7 +181,7 @@ export default function Withdrawals() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className={`bg-white rounded-lg shadow p-6 motion-safe:transform motion-safe:transition-all motion-safe:duration-500 ${animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} hover:shadow-md hover:translate-y-0.5`}>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-yellow-100 rounded-lg">
               <Clock className="w-6 h-6 text-yellow-600" />
@@ -185,7 +195,7 @@ export default function Withdrawals() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className={`bg-white rounded-lg shadow p-6 motion-safe:transform motion-safe:transition-all motion-safe:duration-500 ${animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} hover:shadow-md hover:translate-y-0.5`}>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-100 rounded-lg">
               <CheckCircle className="w-6 h-6 text-green-600" />
@@ -199,7 +209,7 @@ export default function Withdrawals() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className={`bg-white rounded-lg shadow p-6 motion-safe:transform motion-safe:transition-all motion-safe:duration-500 ${animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} hover:shadow-md hover:translate-y-0.5`}>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">
               <Banknote className="w-6 h-6 text-blue-600" />
@@ -216,7 +226,7 @@ export default function Withdrawals() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className={`bg-white rounded-lg shadow p-6 motion-safe:transform motion-safe:transition-all motion-safe:duration-500 ${animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} hover:shadow-md hover:translate-y-0.5`}>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-100 rounded-lg">
               <AlertCircle className="w-6 h-6 text-red-600" />
@@ -232,13 +242,13 @@ export default function Withdrawals() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className={`bg-white rounded-lg shadow p-6 motion-safe:transition-all motion-safe:duration-500 ${animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
         <div className="flex flex-wrap gap-2">
           {["all", "pending", "approved", "rejected", "disbursed"].map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors duration-200 ${
                 filter === status
                   ? "bg-orange-100 text-orange-800 border border-orange-200"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -268,8 +278,12 @@ export default function Withdrawals() {
               </p>
             </div>
           ) : (
-            filteredWithdrawals.map((withdrawal) => (
-              <div key={withdrawal._id} className="px-6 py-6">
+            filteredWithdrawals.map((withdrawal, idx) => (
+              <div
+                key={withdrawal._id}
+                className={`px-6 py-6 motion-safe:transform motion-safe:transition-all motion-safe:duration-500 ${animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+                style={{ transitionDelay: `${idx * 50}ms` }}
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     {/* Header */}
@@ -280,7 +294,7 @@ export default function Withdrawals() {
                           {withdrawal.memberId.name} - ₹{withdrawal.amount.toLocaleString()}
                         </h3>
                         <p className="text-sm text-slate-600">
-                          Requested on {withdrawal.requestDate.toLocaleDateString()}
+                          Requested on {formatDate(withdrawal.requestDate)}
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -368,7 +382,7 @@ export default function Withdrawals() {
                       setSelectedWithdrawal(withdrawal);
                       setShowModal(true);
                     }}
-                    className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 flex items-center gap-1"
+                    className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 flex items-center gap-1 transition-transform hover:-translate-y-0.5"
                   >
                     <Eye className="w-4 h-4" />
                     View Details
@@ -379,7 +393,7 @@ export default function Withdrawals() {
                       <button
                         onClick={() => handleAction(withdrawal._id, "approve", "Approved after review")}
                         disabled={actionLoading}
-                        className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 disabled:opacity-50"
+                        className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
                       >
                         <CheckCircle className="w-4 h-4 inline mr-1" />
                         Approve
@@ -387,7 +401,7 @@ export default function Withdrawals() {
                       <button
                         onClick={() => handleAction(withdrawal._id, "reject", "Insufficient documentation")}
                         disabled={actionLoading}
-                        className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                        className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
                       >
                         <XCircle className="w-4 h-4 inline mr-1" />
                         Reject
@@ -399,7 +413,7 @@ export default function Withdrawals() {
                     <button
                       onClick={() => handleAction(withdrawal._id, "disburse", "Amount disbursed")}
                       disabled={actionLoading}
-                      className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 disabled:opacity-50"
+                      className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
                     >
                       <Banknote className="w-4 h-4 inline mr-1" />
                       Mark as Disbursed
@@ -415,7 +429,7 @@ export default function Withdrawals() {
       {/* Modal for withdrawal details */}
       {showModal && selectedWithdrawal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto motion-safe:transform motion-safe:transition-all motion-safe:duration-300 motion-safe:scale-100">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-slate-900">Withdrawal Request Details</h2>
               <button
@@ -490,6 +504,33 @@ export default function Withdrawals() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("Error in Withdrawals:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h2 className="text-red-700 font-semibold">Something went wrong</h2>
+            <p className="text-sm text-red-600">Please refresh the page or try again.</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }

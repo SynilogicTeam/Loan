@@ -51,26 +51,37 @@ export const payContribution = async (req, res) => {
     let lateFee = 0;
     const today = new Date();
 
-    if (today > contribution.dueDate) {
+    if (contribution.dueDate && today > contribution.dueDate) {
       lateFee = 50; // 🔥 later configurable
     }
 
     contribution.status = "PAID";
-    contribution.paidDate = today;
+    contribution.paidAt = today;
     contribution.lateFee = lateFee;
 
     await contribution.save();
     
 /* after contribution save */
+    const session = await Session.findById(contribution.sessionId);
+    if (!session) {
+      return res.status(404).json({ message: "Session not found for this contribution" });
+    }
+
+    const newBalance = (session.closingBalance || 0) + (contribution.amount || 0) + (contribution.lateFee || 0);
+
     await Ledger.create({
       communityId: contribution.communityId,
       sessionId: contribution.sessionId,
       memberId: contribution.memberId,
       type: "CREDIT",
       category: "CONTRIBUTION",
-      amount: contribution.amount + contribution.lateFee,
+      amount: (contribution.amount || 0) + (contribution.lateFee || 0),
       description: "Monthly contribution received",
+      balance: newBalance
     });
+
+    session.closingBalance = newBalance;
+    await session.save();
 
     res.json({
       message: "Contribution paid",

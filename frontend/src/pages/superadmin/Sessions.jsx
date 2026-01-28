@@ -47,7 +47,7 @@ export default function SuperAdminSessions() {
     try {
       console.log("Loading communities...");
       // This should be a Super Admin API call to get all communities
-      const response = await fetch('/api/platform/communities', {
+      const response = await fetch('/api/communities', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
           'Content-Type': 'application/json'
@@ -59,7 +59,7 @@ export default function SuperAdminSessions() {
       if (response.ok) {
         const data = await response.json();
         console.log("Communities loaded:", data);
-        setCommunities(data);
+        setCommunities(Array.isArray(data) ? data : []); // Ensure it's an array
       } else {
         console.error("Failed to load communities:", response.status);
         const error = await response.text();
@@ -88,7 +88,7 @@ export default function SuperAdminSessions() {
       if (response.ok) {
         const data = await response.json();
         console.log("Sessions loaded:", data);
-        setAllSessions(data);
+        setAllSessions(data.sessions || []); // Extract sessions array
       } else {
         console.error("Failed to load sessions:", response.status);
         const error = await response.text();
@@ -217,8 +217,8 @@ export default function SuperAdminSessions() {
   };
 
   const filteredSessions = selectedCommunity === 'all' 
-    ? allSessions 
-    : allSessions.filter(session => session.communityId === selectedCommunity);
+    ? (Array.isArray(allSessions) ? allSessions : [])
+    : (Array.isArray(allSessions) ? allSessions.filter(session => session.communityId === selectedCommunity) : []);
 
   return (
     <div className="space-y-6">
@@ -252,18 +252,6 @@ export default function SuperAdminSessions() {
           >
             <Plus className="w-4 h-4" />
             Create Session
-          </button>
-          <button
-            onClick={() => {
-              console.log("Test button clicked!");
-              console.log("Current sessions:", allSessions);
-              console.log("Current communities:", communities);
-              console.log("Current stats:", stats);
-              alert("Test button working! Check console for data.");
-            }}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Test
           </button>
         </div>
       </div>
@@ -340,7 +328,7 @@ export default function SuperAdminSessions() {
                 <span className="text-sm font-medium text-indigo-600">Active Sessions</span>
               </div>
               <p className="text-2xl font-bold text-indigo-900">
-                {allSessions.filter(s => s.isActive).length}
+                {Array.isArray(allSessions) ? allSessions.filter(s => s.isActive).length : 0}
               </p>
               <p className="text-sm text-indigo-700">running sessions</p>
             </div>

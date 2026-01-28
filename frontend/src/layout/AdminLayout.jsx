@@ -2,24 +2,23 @@ import { Outlet } from "react-router-dom";
 import AdminSidebar from "../components/Sidebar/AdminSidebar";
 import Topbar from "../components/Topbar/Topbar";
 import CommunitySwitcher from "../components/CommunitySwitcher";
-console.log("ADMIN LAYOUT RENDERED");
 
 export default function AdminLayout() {
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      {/* SIDEBAR */}
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
       <AdminSidebar />
 
-      {/* MAIN AREA */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* TOPBAR */}
+        {/* Topbar */}
         <Topbar />
 
-        {/* COMMUNITY INFO/SWITCHER */}
+        {/* Community Switcher */}
         <CommunitySwitcher />
 
-        {/* PAGE CONTENT */}
-        <main className="p-6">
+        {/* Page Content */}
+        <main className="flex-1 p-6">
           <Outlet />
         </main>
       </div>

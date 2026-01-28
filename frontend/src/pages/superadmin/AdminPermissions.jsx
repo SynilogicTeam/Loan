@@ -181,46 +181,6 @@ export default function AdminPermissions() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => {
-              console.log("Test button clicked!");
-              console.log("Current admins:", admins);
-              console.log("Current communities:", communities);
-              alert("Test button working! Check console for data.");
-            }}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Test Button
-          </button>
-          <button
-            onClick={async () => {
-              console.log("Testing API directly...");
-              try {
-                const response = await fetch('/api/platform/admins', {
-                  headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                console.log("API Response Status:", response.status);
-                if (response.ok) {
-                  const data = await response.json();
-                  console.log("API Data:", data);
-                  alert("API Test Successful! Check console for data.");
-                } else {
-                  const error = await response.text();
-                  console.error("API Error:", error);
-                  alert("API Test Failed: " + response.status);
-                }
-              } catch (error) {
-                console.error("API Test Error:", error);
-                alert("API Test Error: " + error.message);
-              }
-            }}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            Test API
-          </button>
-          <button
             onClick={loadData}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >

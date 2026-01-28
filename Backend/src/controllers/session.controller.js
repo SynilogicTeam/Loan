@@ -352,7 +352,11 @@ export const getAllSessions = async (req, res) => {
       .populate('communityId', 'name')
       .sort({ createdAt: -1 });
 
-    res.json(sessions);
+    res.json({ 
+      success: true,
+      sessions: sessions,
+      count: sessions.length 
+    });
   } catch (error) {
     console.error("Get all sessions error:", error);
     res.status(500).json({ message: error.message });

@@ -18,9 +18,24 @@ export default function RazorpayPayment({
     try {
       setLoading(true);
 
+      // Validate required props with better error handling
+      const numericAmount = parseFloat(amount);
+      if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
+        console.error("❌ Invalid amount:", { amount, numericAmount });
+        throw new Error(`Invalid payment amount: ${amount}. Please enter a valid number.`);
+      }
+
+      console.log('💰 Payment Details:', {
+        amount: numericAmount,
+        description,
+        contributionId,
+        loanId,
+        emiId
+      });
+
       // Step 1: Create Razorpay order
       const orderResponse = await api.post("/payments/create-order", {
-        amount: amount,
+        amount: numericAmount,
         currency: "INR",
         receipt: `receipt_${Date.now()}`,
         notes: {
@@ -33,10 +48,10 @@ export default function RazorpayPayment({
 
       const { order, key_id, isDemoMode } = orderResponse.data;
 
-      if (isDemoMode) {
+      if (isDemoMode || orderResponse.data.mock) {
         // Demo mode - simulate payment without Razorpay
         const demoPaymentResponse = {
-          razorpay_order_id: order.id,
+          razorpay_order_id: orderResponse.data.orderId,
           razorpay_payment_id: `demo_${Date.now()}`,
           razorpay_signature: "demo_signature",
         };
@@ -44,7 +59,7 @@ export default function RazorpayPayment({
         // Show demo payment dialog with better messaging
         const confirmPayment = window.confirm(
           `🎭 DEMO PAYMENT MODE\n\n` +
-          `Amount: ₹${amount}\n` +
+          `Amount: ₹${numericAmount}\n` +
           `Description: ${description}\n\n` +
           `⚠️ This is a demo payment because:\n` +
           `• Razorpay test credentials are not working\n` +
@@ -67,12 +82,12 @@ export default function RazorpayPayment({
         console.log("🚀 Opening REAL Razorpay checkout with your test keys");
         
         const options = {
-          key: key_id,
-          amount: order.amount,
-          currency: order.currency,
+          key: orderResponse.data.key,
+          amount: orderResponse.data.amount,
+          currency: orderResponse.data.currency,
           name: "Community Fund Manager",
           description: description,
-          order_id: order.id,
+          order_id: orderResponse.data.orderId,
           handler: async function (response) {
             console.log("✅ Real Razorpay payment completed:", response);
             await handlePaymentSuccess(response, { isDemoMode: false });
@@ -117,7 +132,7 @@ export default function RazorpayPayment({
     } catch (error) {
       console.error("Payment initiation error:", error);
       setLoading(false);
-      onError && onError(error.response?.data?.message || "Payment failed to initiate");
+      onError && onError(error.response?.data?.message || error.message || "Payment failed to initiate");
     }
   };
 

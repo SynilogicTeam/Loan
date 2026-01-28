@@ -40,12 +40,7 @@ Backend/dist/
 Backend/build/
 
 # Mobile build
-CommunityFundMobile/dist/
-CommunityFundMobile/.expo/
-CommunityFundMobile/.expo-shared/
-CommunityFundMobile/android/app/build/
-CommunityFundMobile/ios/Pods/
-CommunityFundMobile/ios/build/
+
 
 # ===========================
 # Logs
@@ -124,13 +119,7 @@ temp/
 # ===========================
 # Mobile Specific
 # ===========================
-# React Native / Expo
-CommunityFundMobile/.expo/
-CommunityFundMobile/.expo-shared/
-CommunityFundMobile/android/app/build/
-CommunityFundMobile/ios/Pods/
-CommunityFundMobile/ios/**/*.xcworkspace
-!CommunityFundMobile/ios/**/*.xcworkspace/contents.xcworkspacedata
+#
 
 # Gradle (Android)
 .gradle/

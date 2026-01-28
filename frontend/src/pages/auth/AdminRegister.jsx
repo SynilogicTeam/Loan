@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../../api/axios";
-import { getCommunities } from "../../api/community.api";
 
 export default function AdminRegister() {
   const navigate = useNavigate();
@@ -11,26 +10,11 @@ export default function AdminRegister() {
     email: "",
     password: "",
     confirmPassword: "",
-    communityId: "",
+    phone: "",
   });
   
-  const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Load communities for selection
-  useEffect(() => {
-    loadCommunities();
-  }, []);
-
-  const loadCommunities = async () => {
-    try {
-      const res = await getCommunities();
-      setCommunities(res.data || []);
-    } catch (err) {
-      console.error("Failed to load communities:", err);
-    }
-  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -38,8 +22,8 @@ export default function AdminRegister() {
     setError("");
 
     // Validation
-    if (!form.name || !form.email || !form.password || !form.communityId) {
-      setError("All fields are required");
+    if (!form.name || !form.email || !form.password) {
+      setError("Name, email, and password are required");
       setLoading(false);
       return;
     }
@@ -61,10 +45,10 @@ export default function AdminRegister() {
         name: form.name,
         email: form.email,
         password: form.password,
-        communityId: form.communityId,
+        phone: form.phone,
       });
 
-      alert("Admin registration successful! Please login.");
+      alert("Admin registration successful! You can now login and create your community.");
       navigate("/login");
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
@@ -78,10 +62,10 @@ export default function AdminRegister() {
       <div className="bg-white w-full max-w-md p-8 rounded-xl border shadow-lg">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-semibold text-slate-800">
-            Admin Registration
+            Create Admin Account
           </h2>
           <p className="text-slate-600 mt-2">
-            Create your admin account
+            Register as an admin to manage your community
           </p>
         </div>
 
@@ -122,21 +106,29 @@ export default function AdminRegister() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Community
+              Phone Number
             </label>
-            <select
+            <input
+              type="tel"
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={form.communityId}
-              onChange={(e) => setForm({ ...form, communityId: e.target.value })}
-              required
-            >
-              <option value="">Select Community</option>
-              {communities.map((community) => (
-                <option key={community._id} value={community._id}>
-                  {community.name}
-                </option>
-              ))}
-            </select>
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="Enter your phone number"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Account Type
+            </label>
+            <div className="w-full px-3 py-2 border border-indigo-300 rounded-lg bg-indigo-50">
+              <div className="flex items-center">
+                <span className="text-indigo-600 font-semibold">👨‍💼 Admin Account</span>
+              </div>
+              <p className="text-sm text-indigo-600 mt-1">
+                Create an admin account to manage your community
+              </p>
+            </div>
           </div>
 
           <div>

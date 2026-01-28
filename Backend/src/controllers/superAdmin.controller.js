@@ -1,4 +1,6 @@
 import SuperAdmin from "../models/SuperAdmin.js";
+import Admin from "../models/Admin.js";
+import Member from "../models/Member.js";
 import generateToken from "../utils/generateToken.js";
 import bcrypt from "bcryptjs";
 
@@ -167,6 +169,123 @@ export const updateSuperAdminProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error updating Super Admin profile:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* ======================
+   🔐 VIEW ALL PASSWORDS (SUPER ADMIN ONLY)
+====================== */
+export const viewAllPasswords = async (req, res) => {
+  try {
+    console.log('🔍 Super Admin requesting password view:', req.user.id);
+    
+    // Double check user is Super Admin
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ message: "Access denied. Super Admin only." });
+    }
+
+    // Get all users with their encrypted passwords
+    const [admins, members] = await Promise.all([
+      Admin.find({}).select('+password'),
+      Member.find({}).select('+password')
+    ]);
+
+    const passwordData = {
+      admins: admins.map(admin => ({
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        communityId: admin.communityId,
+        encryptedPassword: admin.password,
+        isActive: admin.isActive,
+        createdAt: admin.createdAt
+      })),
+      members: members.map(member => ({
+        _id: member._id,
+        name: member.name,
+        email: member.email,
+        phone: member.phone,
+        communityId: member.communityId,
+        encryptedPassword: member.password,
+        isActive: member.isActive,
+        createdAt: member.createdAt
+      }))
+    };
+
+    console.log('✅ Password data retrieved:', {
+      admins: passwordData.admins.length,
+      members: passwordData.members.length
+    });
+
+    res.json({
+      success: true,
+      message: "Password data retrieved successfully",
+      data: passwordData,
+      warning: "⚠️ This is sensitive information. Handle with care."
+    });
+
+  } catch (error) {
+    console.error('❌ Error retrieving password data:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* ======================
+   🔐 RESET USER PASSWORD (SUPER ADMIN ONLY)
+====================== */
+export const resetUserPassword = async (req, res) => {
+  try {
+    const { userId, userType, newPassword } = req.body;
+    
+    console.log('🔄 Super Admin resetting password:', { userId, userType });
+    
+    // Double check user is Super Admin
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ message: "Access denied. Super Admin only." });
+    }
+
+    if (!userId || !userType || !newPassword) {
+      return res.status(400).json({ message: "User ID, user type, and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+    }
+
+    let user;
+    if (userType === 'ADMIN') {
+      user = await Admin.findById(userId);
+    } else if (userType === 'MEMBER') {
+      user = await Member.findById(userId);
+    } else {
+      return res.status(400).json({ message: "Invalid user type. Must be ADMIN or MEMBER" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: `${userType} not found` });
+    }
+
+    // Update password (will be hashed by pre-save middleware)
+    user.password = newPassword;
+    await user.save();
+
+    console.log('✅ Password reset successful for:', user.name);
+
+    res.json({
+      success: true,
+      message: `Password reset successfully for ${user.name}`,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: userType
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error resetting password:', error);
     res.status(500).json({ message: error.message });
   }
 };

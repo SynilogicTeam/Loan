@@ -2,6 +2,7 @@ import Loan from "../models/Loan.js";
 import EMI from "../models/EMI.js";
 import Session from "../models/Session.js";
 import Member from "../models/Member.js";
+import Ledger from "../models/Ledger.js";
 
 /* =========================
    CREATE LOAN (ADMIN)
@@ -58,23 +59,35 @@ export const createLoan = async (req, res) => {
 
       emis.push({
         loanId: loan._id,
+        memberId: loan.memberId,
+        communityId: loan.communityId,
+        sessionId: loan.sessionId,
         month: i,
         dueDate: due,
         amount: emiAmount,
+        status: "PENDING"
       });
     }
 
     await EMI.insertMany(emis);
 
+    // Create ledger entry for loan disbursement
     await Ledger.create({
-        communityId: loan.communityId,
-        sessionId: loan.sessionId,
-        memberId: loan.memberId,
-        type: "DEBIT",
-        category: "LOAN",
-        amount: loan.principalAmount,
-        description: "Loan disbursed to member",
-      });
+      communityId: loan.communityId,
+      sessionId: loan.sessionId,
+      memberId: loan.memberId,
+      type: "DEBIT",
+      category: "LOAN",
+      amount: loan.principalAmount,
+      description: `Loan disbursed - ${loan.purpose || 'General'}`,
+      balance: session.closingBalance - loan.principalAmount
+    });
+
+    // Update session balance
+    session.closingBalance -= loan.principalAmount;
+    await session.save();
+
+    console.log(`✅ Loan created with ${emis.length} EMI records and ledger entry`);
       
 
     res.status(201).json({
@@ -113,15 +126,23 @@ export const payEmi = async (req, res) => {
 
     await loan.save();
 
+    // Create ledger entry for EMI payment
     await Ledger.create({
-        communityId: loan.communityId,
-        sessionId: loan.sessionId,
-        memberId: loan.memberId,
-        type: "CREDIT",
-        category: "EMI",
-        amount: emi.amount,
-        description: "Loan EMI received",
-      });
+      communityId: loan.communityId,
+      sessionId: loan.sessionId,
+      memberId: loan.memberId,
+      type: "CREDIT",
+      category: "EMI",
+      amount: emi.amount,
+      description: `EMI Payment - Month ${emi.month}`,
+      balance: session.closingBalance + emi.amount
+    });
+
+    // Update session balance
+    session.closingBalance += emi.amount;
+    await session.save();
+
+    console.log(`✅ EMI payment processed: ₹${emi.amount} for Month ${emi.month}`);
       
 
     res.json({ message: "EMI paid successfully" });

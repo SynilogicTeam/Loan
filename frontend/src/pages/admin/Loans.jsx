@@ -81,19 +81,19 @@ export default function Loans() {
           adminRemarks: remarks || "Loan cancelled by admin"
         });
       }
-      
+
       // Update local state
-      setLoans(prev => prev.map(loan => 
-        loan._id === loanId 
-          ? { 
-              ...loan, 
-              status: action.toUpperCase(),
-              adminRemarks: remarks,
-              [action === "approve" ? "approvedAt" : action === "reject" ? "rejectedAt" : "cancelledAt"]: new Date()
-            }
+      setLoans(prev => prev.map(loan =>
+        loan._id === loanId
+          ? {
+            ...loan,
+            status: action.toUpperCase(),
+            adminRemarks: remarks,
+            [action === "approve" ? "approvedAt" : action === "reject" ? "rejectedAt" : "cancelledAt"]: new Date()
+          }
           : loan
       ));
-      
+
       alert(`Loan ${action}d successfully!`);
       setShowModal(false);
       setSelectedLoan(null);
@@ -241,11 +241,10 @@ export default function Loans() {
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${
-                filter === status
-                  ? "bg-blue-100 text-blue-800 border border-blue-200"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${filter === status
+                ? "bg-blue-100 text-blue-800 border border-blue-200"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
             >
               {status}
               {status === "all" && (
@@ -264,7 +263,7 @@ export default function Loans() {
               <HandCoins className="w-12 h-12 text-slate-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-900 mb-2">No loan applications</h3>
               <p className="text-slate-600">
-                {filter === "all" 
+                {filter === "all"
                   ? "No loan applications have been submitted yet."
                   : `No ${filter} loan applications found.`
                 }
@@ -280,7 +279,7 @@ export default function Loans() {
                       {getStatusIcon(loan.status)}
                       <div>
                         <h3 className="font-semibold text-slate-900">
-                          {loan.memberId.name} - ₹{loan.principalAmount.toLocaleString()}
+                          {loan.memberId?.name || 'Unknown Member'} - ₹{loan.principalAmount.toLocaleString()}
                         </h3>
                         <p className="text-sm text-slate-600">
                           Applied on {new Date(loan.appliedAt).toLocaleDateString()}
@@ -297,9 +296,9 @@ export default function Loans() {
                         <span className="text-sm text-slate-500">Member</span>
                         <p className="font-medium flex items-center gap-1">
                           <User className="w-4 h-4" />
-                          {loan.memberId.name}
+                          {loan.memberId?.name || 'Unknown'}
                         </p>
-                        <p className="text-sm text-slate-600">{loan.memberId.phone}</p>
+                        <p className="text-sm text-slate-600">{loan.memberId?.phone || 'N/A'}</p>
                       </div>
                       <div>
                         <span className="text-sm text-slate-500">Purpose</span>
@@ -369,7 +368,7 @@ export default function Loans() {
                     <Eye className="w-4 h-4" />
                     View Details
                   </button>
-                  
+
                   {loan.status === "PENDING" && (
                     <>
                       <button
@@ -390,7 +389,7 @@ export default function Loans() {
                       </button>
                     </>
                   )}
-                  
+
                   {(loan.status === "APPROVED" || loan.status === "ACTIVE") && (
                     <button
                       onClick={() => handleAction(loan._id, "cancel", "Loan cancelled by admin")}
@@ -421,20 +420,20 @@ export default function Loans() {
                 ✕
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-slate-500">Member Name</label>
-                  <p className="font-medium">{selectedLoan.memberId.name}</p>
+                  <p className="font-medium">{selectedLoan.memberId?.name || 'Unknown'}</p>
                 </div>
                 <div>
                   <label className="text-sm text-slate-500">Phone</label>
-                  <p className="font-medium">{selectedLoan.memberId.phone}</p>
+                  <p className="font-medium">{selectedLoan.memberId?.phone || 'N/A'}</p>
                 </div>
                 <div>
                   <label className="text-sm text-slate-500">Email</label>
-                  <p className="font-medium">{selectedLoan.memberId.email}</p>
+                  <p className="font-medium">{selectedLoan.memberId?.email || 'N/A'}</p>
                 </div>
                 <div>
                   <label className="text-sm text-slate-500">Monthly Income</label>
@@ -451,17 +450,17 @@ export default function Loans() {
                   </p>
                 </div>
               </div>
-              
+
               <div>
                 <label className="text-sm text-slate-500">Purpose</label>
                 <p className="font-medium">{selectedLoan.purpose}</p>
               </div>
-              
+
               <div>
                 <label className="text-sm text-slate-500">Guarantors</label>
                 <p className="text-slate-700">{[selectedLoan.guarantor1, selectedLoan.guarantor2].filter(Boolean).join(", ") || "None"}</p>
               </div>
-              
+
               <div className="flex gap-4 pt-4">
                 <button
                   onClick={() => setShowModal(false)}

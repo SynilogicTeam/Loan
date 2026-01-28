@@ -1,8 +1,9 @@
 import express from "express";
 import Community from "../models/Community.js";   // ✅ MISSING IMPORT
-import { createCommunity } from "../controllers/community.controller.js";
+import { createCommunity, createCommunityByAdmin } from "../controllers/community.controller.js";
 import protect from "../middelware/auth.js";
 import isSuperAdmin from "../middelware/isSuperAdmin.js";
+import isAdmin from "../middelware/isAdmin.js";
 
 const router = express.Router();
 
@@ -10,6 +11,11 @@ const router = express.Router();
    SUPER ADMIN → CREATE COMMUNITY
 ====================== */
 router.post("/", protect, isSuperAdmin, createCommunity);
+
+/* ======================
+   ADMIN → CREATE COMMUNITY
+====================== */
+router.post("/create", protect, isAdmin, createCommunityByAdmin);
 
 /* ======================
    SUPER ADMIN → GET ALL COMMUNITIES

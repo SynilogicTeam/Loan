@@ -9,6 +9,7 @@ import Member from "../models/Member.js";
 import Contribution from "../models/Contribution.js";
 import Loan from "../models/Loan.js";
 import Withdrawal from "../models/Withdrawal.js";
+import generateToken from "../utils/generateToken.js";
 
 const router = express.Router();
 
@@ -921,6 +922,46 @@ router.get('/all', protect, isSuperAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching admins:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/* ======================
+   IMPERSONATE ADMIN (SUPER ADMIN)
+====================== */
+router.post("/:adminId/impersonate", protect, isSuperAdmin, async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const admin = await Admin.findById(adminId).populate("communityId");
+    
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+    
+    if (admin.isActive === false) {
+      return res.status(403).json({ message: "Admin account is deactivated" });
+    }
+    
+    const token = generateToken(admin._id, admin.role);
+    
+    const responseData = {
+      _id: admin._id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+      permissions: admin.permissions || [],
+      isActive: admin.isActive,
+      token,
+    };
+    
+    if (admin.communityId) {
+      responseData.communityId = admin.communityId._id;
+      responseData.communityName = admin.communityId.name;
+    }
+    
+    res.json(responseData);
+  } catch (error) {
+    console.error("Impersonate admin error:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 

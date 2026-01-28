@@ -6,33 +6,9 @@ import generateToken from "../utils/generateToken.js";
 ========================= */
 export const registerMember = async (req, res) => {
   try {
-    const { name, email, phone, password, communityId } = req.body;
-
-    if (!name || !email || !phone || !password || !communityId) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-
-    const exists = await Member.findOne({ email });
-    if (exists) {
-      return res.status(400).json({ message: "Member already exists with this email" });
-    }
-
-    const member = await Member.create({
-      name,
-      email,
-      phone,
-      password,
-      communityId,
-    });
-
-    res.status(201).json({
-      _id: member._id,
-      name: member.name,
-      email: member.email,
-      phone: member.phone,
-      role: member.role,
-      communityId: member.communityId,
-      token: generateToken(member._id, member.role),
+    // Member registration is disabled - members can only be added by admins
+    return res.status(403).json({
+      message: "Member registration is disabled. Members can only be added by community administrators."
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -48,11 +24,11 @@ export const createMember = async (req, res) => {
     console.log("USER ROLE 👉", req.user.role);
     console.log("USER COMMUNITY ID 👉", req.user.communityId);
 
-    const { 
-      name, 
-      email, 
-      password, 
-      phone, 
+    const {
+      name,
+      email,
+      password,
+      phone,
       communityId,
       address,
       occupation,
@@ -76,7 +52,7 @@ export const createMember = async (req, res) => {
     // For Super Admin, communityId should come from request body
     // For regular Admin, use their assigned communityId
     let memberCommunityId;
-    
+
     if (req.user.role === "SUPER_ADMIN") {
       if (!communityId) {
         return res.status(400).json({ message: "Community ID is required for Super Admin" });
@@ -116,8 +92,8 @@ export const createMember = async (req, res) => {
     // Update community member count
     const Community = (await import("../models/Community.js")).default;
     const currentMemberCount = await Member.countDocuments({ communityId: memberCommunityId });
-    await Community.findByIdAndUpdate(memberCommunityId, { 
-      memberCount: currentMemberCount 
+    await Community.findByIdAndUpdate(memberCommunityId, {
+      memberCount: currentMemberCount
     });
 
     console.log("MEMBER CREATED SUCCESSFULLY 👉", member._id);
@@ -139,11 +115,11 @@ export const createMember = async (req, res) => {
 export const getMembers = async (req, res) => {
   try {
     let query = {};
-    
+
     // Super Admin can see all members, Admin sees only their community members
     if (req.user.role === "ADMIN") {
       if (!req.user.communityId) {
-        return res.status(400).json({ message: "Admin not assigned to any community" });
+        return res.json({ success: true, members: [], count: 0 });
       }
       query.communityId = req.user.communityId;
     }
@@ -151,7 +127,11 @@ export const getMembers = async (req, res) => {
 
     const members = await Member.find(query).select("-password");
 
-    res.json(members);
+    res.json({
+      success: true,
+      members: members,
+      count: members.length
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -163,7 +143,7 @@ export const getMembers = async (req, res) => {
 export const loginMember = async (req, res) => {
   try {
     console.log("MEMBER LOGIN REQUEST 👉", req.body);
-    
+
     const { email, password } = req.body;
 
     if (!email || !password) {

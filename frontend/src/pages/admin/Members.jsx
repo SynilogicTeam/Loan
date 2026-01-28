@@ -25,8 +25,37 @@ export default function Members() {
   const loadMembers = async () => {
     try {
       setLoading(true);
+      
+      // Debug authentication
+      const role = localStorage.getItem('role');
+      const adminToken = localStorage.getItem('adminToken');
+      const memberToken = localStorage.getItem('memberToken');
+      
+      console.log('Members - Auth Debug:', {
+        role,
+        hasAdminToken: !!adminToken,
+        hasMemberToken: !!memberToken,
+        adminTokenLength: adminToken?.length,
+        memberTokenLength: memberToken?.length
+      });
+      
       const res = await getMembers();
-      setMembers(res.data || []);
+      console.log('Members API response:', res.data);
+      
+      // Ensure we always set an array
+      const membersData = Array.isArray(res.data) ? res.data : [];
+      setMembers(membersData);
+    } catch (error) {
+      console.error('Error loading members:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      addToast(error.userMessage || 'Failed to load members', 'error');
+      setMembers([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -36,9 +65,15 @@ export default function Members() {
     if (isSuper) {
       try {
         const res = await getCommunities();
-        setCommunities(res.data || []);
+        console.log('Communities API response:', res.data);
+        
+        // Ensure we always set an array
+        const communitiesData = Array.isArray(res.data) ? res.data : [];
+        setCommunities(communitiesData);
       } catch (err) {
-        console.error(err);
+        console.error('Error loading communities:', err);
+        addToast(err.userMessage || 'Failed to load communities', 'error');
+        setCommunities([]); // Set empty array on error
       }
     }
   };
@@ -139,7 +174,7 @@ export default function Members() {
               onChange={(e) => setForm({ ...form, communityId: e.target.value })}
             >
               <option value="">Select Community</option>
-              {communities.map((community) => (
+              {Array.isArray(communities) && communities.map((community) => (
                 <option key={community._id} value={community._id}>
                   {community.name}
                 </option>
@@ -184,7 +219,7 @@ export default function Members() {
                 </td>
               </tr>
             )}
-            {members.map((m) => (
+            {Array.isArray(members) && members.map((m) => (
               <tr key={m._id} className="border-t hover:bg-slate-50">
                 <td className="p-3 font-medium">{m.name}</td>
                 <td className="p-3 text-slate-600">{m.email}</td>

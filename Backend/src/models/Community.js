@@ -40,7 +40,6 @@ const communitySchema = new mongoose.Schema(
       type: Date,
     },
     
-    // Community Settings
     settings: {
       branding: {
         logo: String,
@@ -56,6 +55,11 @@ const communitySchema = new mongoose.Schema(
         maxMembers: { type: Number, default: 50 },
         maxAdmins: { type: Number, default: 2 },
         maxSessions: { type: Number, default: 12 },
+      },
+      contributions: {
+        fixedEnabled: { type: Boolean, default: false },
+        fixedAmount: { type: Number, default: 0 },
+        fixedDueDay: { type: Number, default: 5 },
       },
     },
 

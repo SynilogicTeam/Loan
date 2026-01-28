@@ -23,6 +23,43 @@ const superAdminSchema = new mongoose.Schema(
       type: String,
       default: "SUPER_ADMIN",
     },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    // User Settings
+    settings: {
+      type: Object,
+      default: {
+        notifications: {
+          email: true,
+          push: true,
+          sms: false,
+          newMembers: true,
+          payments: true,
+          loans: true,
+          overdue: true
+        },
+        security: {
+          twoFactor: false,
+          sessionTimeout: 30,
+          passwordExpiry: 90
+        },
+        appearance: {
+          theme: 'light',
+          language: 'en',
+          dateFormat: 'DD/MM/YYYY',
+          currency: 'INR'
+        },
+        privacy: {
+          profileVisibility: 'admin',
+          dataSharing: false,
+          analytics: true
+        }
+      }
+    },
   },
   { timestamps: true }
 );

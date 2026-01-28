@@ -23,6 +23,16 @@ import Withdrawals from "./pages/admin/Withdrawals";
 import Charity from "./pages/admin/Charity";
 import Sessions from "./pages/admin/Sessions";
 import Reports from "./pages/admin/Reports";
+import InterestRates from "./pages/admin/InterestRates";
+import ExternalBorrowers from "./pages/admin/ExternalBorrowers";
+import ExternalLoans from "./pages/admin/ExternalLoans";
+import Alerts from "./pages/admin/Alerts";
+import PasswordManagement from "./pages/admin/PasswordManagement";
+import SuperAdminProfile from "./pages/admin/SuperAdminProfile";
+import AdminProfile from "./pages/admin/AdminProfile";
+import Settings from "./pages/admin/Settings";
+import Notifications from "./pages/admin/Notifications";
+import AdminOnboarding from "./pages/admin/AdminOnboarding";
 
 /* =========================
    SUPER ADMIN PAGES
@@ -66,6 +76,11 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register/admin" element={<AdminRegister />} />
       <Route path="/register/member" element={<MemberRegister />} />
+
+      {/* =========================
+          ADMIN ONBOARDING (NO LAYOUT)
+      ========================= */}
+      <Route path="/admin/onboarding" element={<AdminOnboarding />} />
 
       {/* =========================
           ADMIN PANEL (COMMON LAYOUT)
@@ -148,6 +163,60 @@ function App() {
           }
         />
 
+        <Route
+          path="reports"
+          element={
+            <AdminRoute>
+              <Reports />
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="interest-rates"
+          element={
+            <AdminRoute>
+              <InterestRates />
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="external-borrowers"
+          element={
+            <AdminRoute>
+              <ExternalBorrowers />
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="external-loans"
+          element={
+            <AdminRoute>
+              <ExternalLoans />
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="alerts"
+          element={
+            <AdminRoute>
+              <Alerts />
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="social-fund"
+          element={
+            <AdminRoute>
+              <Charity />
+            </AdminRoute>
+          }
+        />
+
         {/* ========== SUPER ADMIN ONLY ROUTES ========== */}
         <Route
           path="communities"
@@ -195,6 +264,15 @@ function App() {
         />
 
         <Route
+          path="password-management"
+          element={
+            <SuperAdminRoute>
+              <PasswordManagement />
+            </SuperAdminRoute>
+          }
+        />
+
+        <Route
           path="platform-management"
           element={
             <SuperAdminRoute>
@@ -208,6 +286,81 @@ function App() {
           element={
             <SuperAdminRoute>
               <SuperAdminSocialFunds />
+            </SuperAdminRoute>
+          }
+        />
+
+        <Route
+          path="interest-rates"
+          element={
+            <SuperAdminRoute>
+              <InterestRates />
+            </SuperAdminRoute>
+          }
+        />
+
+        <Route
+          path="external-borrowers"
+          element={
+            <SuperAdminRoute>
+              <ExternalBorrowers />
+            </SuperAdminRoute>
+          }
+        />
+
+        <Route
+          path="external-loans"
+          element={
+            <SuperAdminRoute>
+              <ExternalLoans />
+            </SuperAdminRoute>
+          }
+        />
+
+        <Route
+          path="alerts"
+          element={
+            <SuperAdminRoute>
+              <Alerts />
+            </SuperAdminRoute>
+          }
+        />
+
+        <Route
+          path="reports"
+          element={
+            <SuperAdminRoute>
+              <Reports />
+            </SuperAdminRoute>
+          }
+        />
+
+        {/* ========== PROFILE & SETTINGS ROUTES ========== */}
+        <Route
+          path="super-admin-profile"
+          element={
+            <SuperAdminRoute>
+              <SuperAdminProfile />
+            </SuperAdminRoute>
+          }
+        />
+
+        <Route
+          path="admin-profile"
+          element={
+            <AdminRoute>
+              <AdminProfile />
+            </AdminRoute>
+          }
+        />
+
+        <Route path="settings" element={<Settings />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route
+          path="platform-settings"
+          element={
+            <SuperAdminRoute>
+              <Settings />
             </SuperAdminRoute>
           }
         />

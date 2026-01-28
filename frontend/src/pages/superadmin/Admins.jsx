@@ -189,6 +189,109 @@ export default function Admins() {
     }
   };
 
+  const impersonateAdmin = async (admin) => {
+    const confirmed = window.confirm(`Login as ${admin.name}? You will switch from Super Admin to this admin account.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/platform/admins/${admin._id}/impersonate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+        },
+      });
+
+      console.log("Impersonate admin response:", {
+        status: response.status,
+        url: response.url,
+      });
+
+      if (!response.ok) {
+        // Fallback: try /api/admins/:id/impersonate if platform route not found
+        if (response.status === 404) {
+          const alt = await fetch(`/api/admins/${admin._id}/impersonate`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+            },
+          });
+          console.log("Fallback impersonate response:", {
+            status: alt.status,
+            url: alt.url,
+          });
+          if (!alt.ok) {
+            let message = "Failed to login as admin";
+            try {
+              const error = await alt.json();
+              if (error && error.message) {
+                message = error.message;
+              }
+            } catch (err) {
+              console.error("Fallback impersonate parse error:", err);
+            }
+            alert(message);
+            return;
+          }
+          const altData = await alt.json();
+          if (!altData || !altData.token) {
+            alert("Invalid response from server");
+            return;
+          }
+          localStorage.setItem("adminToken", altData.token);
+          localStorage.setItem("role", altData.role || "ADMIN");
+          if (altData.permissions) {
+            localStorage.setItem("permissions", JSON.stringify(altData.permissions));
+          } else {
+            localStorage.removeItem("permissions");
+          }
+          if (altData.communityId) {
+            localStorage.setItem("communityId", altData.communityId);
+          }
+          alert(`You are now logged in as admin "${altData.name}"`);
+          window.location.href = "/admin/dashboard";
+          return;
+        }
+        let message = "Failed to login as admin";
+        try {
+          const error = await response.json();
+          if (error && error.message) {
+            message = error.message;
+          }
+        } catch (err) {
+          console.error("Impersonate admin parse error:", err);
+        }
+        alert(message);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!data || !data.token) {
+        alert("Invalid response from server");
+        return;
+      }
+
+      localStorage.setItem("adminToken", data.token);
+      localStorage.setItem("role", data.role || "ADMIN");
+
+      if (data.permissions) {
+        localStorage.setItem("permissions", JSON.stringify(data.permissions));
+      } else {
+        localStorage.removeItem("permissions");
+      }
+
+      if (data.communityId) {
+        localStorage.setItem("communityId", data.communityId);
+      }
+
+      alert(`You are now logged in as admin "${data.name}"`);
+      window.location.href = "/admin/dashboard";
+    } catch (error) {
+      console.error("Impersonate admin error:", error);
+      alert("Failed to login as admin");
+    }
+  };
+
   const getStatusBadge = (isActive) => {
     return isActive ? (
       <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
@@ -385,6 +488,13 @@ export default function Admins() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
+                      <button
+                        className="text-emerald-600 hover:text-emerald-900 p-1 rounded hover:bg-emerald-50"
+                        title="Login as this admin"
+                        onClick={() => impersonateAdmin(admin)}
+                      >
+                        <Shield className="w-4 h-4" />
+                      </button>
                       <button 
                         className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
                         title="View Details"

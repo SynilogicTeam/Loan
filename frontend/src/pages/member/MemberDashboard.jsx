@@ -8,6 +8,7 @@ export default function MemberDashboard() {
   const [memberData, setMemberData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [contributionStatus, setContributionStatus] = useState(null);
 
   useEffect(() => {
     // Get member data from localStorage or API
@@ -19,48 +20,94 @@ export default function MemberDashboard() {
 
     loadMemberData();
     
-    // Auto-refresh member data every 30 seconds
+    // Auto-refresh member data every 10 seconds for better real-time updates
     const interval = setInterval(() => {
       loadMemberData();
-    }, 30000);
+    }, 10000);
     
-    return () => clearInterval(interval);
+    // Also refresh when the page becomes visible again
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadMemberData();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [navigate]);
 
   const loadMemberData = async () => {
     try {
       setLoading(true);
       
-      // Get member profile
+      console.log('🔄 Loading member data...');
+      
+      // Get member profile with enhanced error handling
       const profileResponse = await getMemberProfile();
       const memberProfile = profileResponse.data;
       
-      // Get member loans
-      const loansResponse = await fetch('/api/members/loans', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('memberToken') || localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
+      console.log('👤 Member Profile Loaded:', {
+        name: memberProfile.name,
+        totalContributions: memberProfile.totalContributions,
+        balance: memberProfile.balance,
+        contributionCount: memberProfile.contributionCount
       });
       
+      // Get member loans with error handling
       let loanData = { activeLoans: 0, totalLoans: 0, approvedLoans: [] };
-      if (loansResponse.ok) {
-        const loans = await loansResponse.json();
-        loanData = {
-          activeLoans: loans.filter(l => l.status === 'ACTIVE').length,
-          totalLoans: loans.length,
-          approvedLoans: loans.filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE')
-        };
+      try {
+        const loansResponse = await fetch('/api/members/loans', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('memberToken') || localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (loansResponse.ok) {
+          const loans = await loansResponse.json();
+          loanData = {
+            activeLoans: loans.filter(l => l.status === 'ACTIVE').length,
+            totalLoans: loans.length,
+            approvedLoans: loans.filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE')
+          };
+          console.log('🏦 Loan Data Loaded:', loanData);
+        }
+      } catch (loanError) {
+        console.log('⚠️ Loan data fetch failed:', loanError.message);
       }
       
       // Combine profile and loan data
-      setMemberData({
+      const combinedData = {
         ...memberProfile,
         ...loanData
-      });
+      };
+      
+      console.log('✅ Combined Member Data:', combinedData);
+      setMemberData(combinedData);
+      
+      // Get contribution status
+      try {
+        const statusResponse = await fetch('/api/members/contribution-status', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('memberToken') || localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (statusResponse.ok) {
+          const status = await statusResponse.json();
+          setContributionStatus(status);
+          console.log('📊 Contribution Status:', status);
+        }
+      } catch (statusError) {
+        console.log('⚠️ Contribution status fetch failed:', statusError.message);
+      }
       
     } catch (err) {
-      console.error("Failed to load member data:", err);
+      console.error("❌ Failed to load member data:", err);
       setError("Failed to load profile data");
     } finally {
       setLoading(false);
@@ -108,6 +155,17 @@ export default function MemberDashboard() {
               </h1>
             </div>
             <div className="flex items-center gap-4">
+              <button
+                onClick={loadMemberData}
+                disabled={loading}
+                className="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                title="Refresh data"
+              >
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </button>
               <div className="text-right">
                 <p className="text-sm font-medium text-slate-700">
                   {memberData?.name || "Member"}
@@ -157,6 +215,35 @@ export default function MemberDashboard() {
               </p>
             </div>
 
+          {contributionStatus?.fixedContributionEnabled && !contributionStatus?.isPaidForCurrentMonth && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-semibold text-yellow-900">Monthly Contribution Due</p>
+                  <p className="text-sm text-yellow-800 mt-1">
+                    ₹{(contributionStatus.fixedContributionAmount || 0).toLocaleString()} for {contributionStatus.currentMonth}
+                  </p>
+                  {contributionStatus.fixedContributionDueDay && (
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Due by day {contributionStatus.fixedContributionDueDay} of this month
+                    </p>
+                  )}
+                  {contributionStatus.isOverdue && (
+                    <p className="text-xs font-medium text-red-700 mt-2">
+                      Overdue. Please pay as soon as possible.
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => navigate("/member/make-contribution")}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm"
+                >
+                  Pay Now
+                </button>
+              </div>
+            </div>
+          )}
+
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white rounded-lg shadow p-6">
@@ -168,7 +255,12 @@ export default function MemberDashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-slate-600">Total Contributions</p>
-                    <p className="text-2xl font-bold text-slate-900">₹{((memberData?.contributionCount || 0) * 5000).toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      ₹{((memberData?.totalContributions || memberData?.balance || 0)).toLocaleString()}
+                    </p>
+                    {memberData?.contributionCount > 0 && (
+                      <p className="text-xs text-blue-600">{memberData.contributionCount} payments made</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -221,14 +313,16 @@ export default function MemberDashboard() {
                       <p className="text-xs text-slate-500">Just now</p>
                     </div>
                   </div>
-                  {memberData?.contributionCount > 0 && (
+                  {(memberData?.totalContributions > 0 || memberData?.balance > 0) && (
                     <div className="flex items-center gap-4 p-3 bg-blue-50 rounded-lg">
                       <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                       <div>
                         <p className="text-sm font-medium text-slate-900">
-                          {memberData.contributionCount} contributions made
+                          Total contributions: ₹{((memberData?.totalContributions || memberData?.balance || 0)).toLocaleString()}
                         </p>
-                        <p className="text-xs text-slate-500">Total: ₹{(memberData.contributionCount * 5000).toLocaleString()}</p>
+                        <p className="text-xs text-slate-500">
+                          {memberData?.contributionCount || 0} payments made
+                        </p>
                       </div>
                     </div>
                   )}

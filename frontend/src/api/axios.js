@@ -1,7 +1,9 @@
 import axios from "axios";
 
+// ✅ USE NETWORK IP SO BOTH WEB AND MOBILE CONNECT TO SAME BACKEND
 const api = axios.create({
-  baseURL: "/api", // Use relative URL to work with Vite proxy
+  baseURL: "http://localhost:5001/api", // Changed to localhost to fix CORS
+  // baseURL: "http://192.168.29.125:5001/api", // Network IP for mobile testing
 });
 
 /* ================= REQUEST INTERCEPTOR ================= */
